@@ -152,7 +152,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
     final pdf = pw.Document();
     pdf.addPage(
       pw.Page(
-        pageFormat: PdfPageFormat.a4.landscape,
+        pageFormat: PdfPageFormat.letter.landscape,
         margin: const pw.EdgeInsets.all(12),
         build: (context) {
           return pw.Column(
@@ -198,7 +198,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                         child: pw.Wrap(
                           alignment: pw.WrapAlignment.center,
                           children: [
-                            pw.Text('Nro de poste en el tendido', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9)),
+                            pw.Text('Nro de poste en el tendido', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
                           ],
                         ),
                       ),
@@ -207,23 +207,23 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                       pw.Container(alignment: pw.Alignment.center, child: pw.Text('S.R 12H', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9))),
                       pw.Container(alignment: pw.Alignment.center, child: pw.Text('S.S 144H', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9))),
                       pw.Container(alignment: pw.Alignment.center, child: pw.Text('S.S 12H', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9))),
-                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('Identificada', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9))),
+                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('Identificacion', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 5))),
                       pw.Container(alignment: pw.Alignment.center, child: pw.Text('Modelo', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9))),
-                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('Tirraje/Fleje', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9))),
-                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('Cantidad', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9))),
-                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('Geolocalización ', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9))),
-                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('Morseteria Fibra 4H Soporte Fibra plana', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9))),
-                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('Tendido con perdida de tension inicio', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9))),
-                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('Tendido con perdida de tensionfin', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9))),
-                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('Reservas 144H Actual', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9))),
-                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('Reservas 144H Acción', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9))),
-                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('Reservas 12H Actual', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9))),
-                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('Reservas 12H Acción', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9))),
+                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('Tirraje Fleje', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9))),
+                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('Cantidad', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8))),
+                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('Geo localización ', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6))),
+                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('Morseteria Fibra 4H Soporte Fibra plana', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6))),
+                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('Tendido con perdida de tension inicio', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6))),
+                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('Tendido con perdida de tension fin', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6))),
+                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('Reservas 144H Actual', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7))),
+                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('Reservas 144H Acción', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7))),
+                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('Reservas 12H Actual', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7))),
+                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('Reservas 12H Acción', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7))),
                       pw.Container(alignment: pw.Alignment.center, child: pw.Text('Zonas poda inicio', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9))),
                       pw.Container(alignment: pw.Alignment.center, child: pw.Text('Zonas poda fin', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9))),
-                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('Postes instalados', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9))),
-                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('Observaciones', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9))),
-                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('Trabajos pendientes', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9))),
+                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('Postes instalados', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7))),
+                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('Observaciones', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 4))),
+                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('Trabajos pendientes', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6))),
                     ],
                   ),
                   // Filas de datos
@@ -264,11 +264,11 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                         pw.Container(alignment: pw.Alignment.center, child: pw.Text(fila['trabajosPendientes'] ?? '', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8))),
                       ],
                     );
-                  }).toList(),
+                  })
                 ],
               ),
               pw.SizedBox(height: 12),
-              pw.Text('Total de registros: ${_tabla.length}', style: pw.TextStyle(fontSize: 12)),
+              pw.Text('Postes : ${_tabla.length}', style: pw.TextStyle(fontSize: 12)),
             ],
           );
         },
@@ -300,11 +300,11 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                     _buildTextField('S.R 12H', _sr12hController),
                     _buildTextField('S.S 144H', _ss144hController),
                     _buildTextField('S.S 12H', _ss12hController),
-                    _buildDropdownField('Identificada', _morseteriaIdentificada, ['SS', 'SR', 'YK01'], (val) {
+                    _buildDropdownField('Identificacion de la morseteria', _morseteriaIdentificada, ['SS', 'SR', 'YK01'], (val) {
                       setState(() { _morseteriaIdentificada = val!; });
                     }),
-                    _buildTextField('Modelo de elemento de fijacion', _modeloController),
-                    _buildDropdownField('Tirraje/Fleje', _tirrajeFleje, ['Tirraje', 'Fleje'], (val) {
+                    _buildTextField('Tipo de elemento de fijacion', _modeloController),
+                    _buildDropdownField('Tirraje / Fleje', _tirrajeFleje, ['Tirraje', 'Fleje', 'Otro'], (val) {
                       setState(() { _tirrajeFleje = val!; });
                     }),
                     _buildTextField('Cantidad de elementos de fijacion', _tirrajeCantidadController),
@@ -361,65 +361,69 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                   ),
                   Expanded(
                     child: SingleChildScrollView(
-                      scrollDirection: Axis.vertical,
+                    scrollDirection: Axis.vertical,
                       child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: DataTable(
-                          columns: [
-                            DataColumn(label: Text('Nro de poste en el tendido')),
-                            DataColumn(label: Text('YK01')),
-                            DataColumn(label: Text('S.R 144H')),
-                            DataColumn(label: Text('S.R 12H')),
-                            DataColumn(label: Text('S.S 144H')),
-                            DataColumn(label: Text('S.S 12H')),
-                            DataColumn(label: Text('Identificada')),
-                            DataColumn(label: Text('Modelo')),
-                            DataColumn(label: Text('Tirraje/Fleje')),
-                            DataColumn(label: Text('Cantidad')),
-                            DataColumn(label: Text('Geolocalización Modelo')),
-                            DataColumn(label: Text('Fibra plana')),
-                            DataColumn(label: Text('Tendido inicio')),
-                            DataColumn(label: Text('Tendido fin')),
-                            DataColumn(label: Text('Reservas 144H Actual')),
-                            DataColumn(label: Text('Reservas 144H Acción')),
-                            DataColumn(label: Text('Reservas 12H Actual')),
-                            DataColumn(label: Text('Reservas 12H Acción')),
-                            DataColumn(label: Text('Zonas poda inicio')),
-                            DataColumn(label: Text('Zonas poda fin')),
-                            DataColumn(label: Text('Postes instalados')),
-                            DataColumn(label: Text('Observaciones')),
-                            DataColumn(label: Text('Trabajos pendientes')),
-                          ],
-                          rows: _tabla.map((fila) {
-                            return DataRow(
-                              cells: [
-                                DataCell(Text('${fila['contador']}')),
-                                DataCell(Text(fila['yk01'] ?? '')),
-                                DataCell(Text(fila['sr144h'] ?? '')),
-                                DataCell(Text(fila['sr12h'] ?? '')),
-                                DataCell(Text(fila['ss144h'] ?? '')),
-                                DataCell(Text(fila['ss12h'] ?? '')),
-                                DataCell(Text(fila['morseteriaIdentificada'] ?? '')),
-                                DataCell(Text(fila['modelo'] ?? '')),
-                                DataCell(Text(fila['tirrajeFleje'] ?? '')),
-                                DataCell(Text(fila['tirrajeCantidad'] ?? '')),
-                                DataCell(Text(fila['geolocalizacionModelo'] ?? '')),
-                                DataCell(Text(fila['fibraPlana'] ?? '')),
-                                DataCell(Text(fila['tendidoInicio'] ?? '')),
-                                DataCell(Text(fila['tendidoFin'] ?? '')),
-                                DataCell(Text(fila['reservas144hActual'] ?? '')),
-                                DataCell(Text(fila['reservas144hAccion'] ?? '')),
-                                DataCell(Text(fila['reservas12hActual'] ?? '')),
-                                DataCell(Text(fila['reservas12hAccion'] ?? '')),
-                                DataCell(Text(fila['zonasPodaInicio'] ?? '')),
-                                DataCell(Text(fila['zonasPodaFin'] ?? '')),
-                                DataCell(Text(fila['postesInstalados'] ?? '')),
-                                DataCell(Text(fila['observaciones'] ?? '')),
-                                DataCell(Text(fila['trabajosPendientes'] ?? '')),
-                              ],
-                            );
-                          }).toList(),
-                        ),
+                        scrollDirection: Axis.horizontal,                      
+                         physics: const AlwaysScrollableScrollPhysics(), // 👈 fuerza el scroll
+                         child: ConstrainedBox(
+                            constraints: BoxConstraints(minWidth: 1500), // 👈 fuerza ancho mínimo
+                          child: DataTable(
+                            columns: [
+                              DataColumn(label: Text('Nro de poste en el tendido')),
+                              DataColumn(label: Text('YK01')),
+                              DataColumn(label: Text('S.R 144H')),
+                              DataColumn(label: Text('S.R 12H')),
+                              DataColumn(label: Text('S.S 144H')),
+                              DataColumn(label: Text('S.S 12H')),
+                              DataColumn(label: Text('Identificacion')),
+                              DataColumn(label: Text('Elemento de fijado')),
+                              DataColumn(label: Text('Tirraje/Fleje')),
+                              DataColumn(label: Text('Cantidad')),
+                              DataColumn(label: Text('Geolocalización')),
+                              DataColumn(label: Text('Fibra plana')),
+                              DataColumn(label: Text('Tendido inicio')),
+                              DataColumn(label: Text('Tendido fin')),
+                              DataColumn(label: Text('Reservas 144H Actual')),
+                              DataColumn(label: Text('Reservas 144H Acción')),
+                              DataColumn(label: Text('Reservas 12H Actual')),
+                              DataColumn(label: Text('Reservas 12H Acción')),
+                              DataColumn(label: Text('Zonas poda inicio')),
+                              DataColumn(label: Text('Zonas poda fin')),
+                              DataColumn(label: Text('Postes instalados')),
+                              DataColumn(label: Text('Observaciones')),
+                              DataColumn(label: Text('Trabajos pendientes')),
+                            ],
+                            rows: _tabla.map((fila) {
+                              return DataRow(
+                                cells: [
+                                  DataCell(Text('${fila['contador']}')),
+                                  DataCell(Text(fila['yk01'] ?? '')),
+                                  DataCell(Text(fila['sr144h'] ?? '')),
+                                  DataCell(Text(fila['sr12h'] ?? '')),
+                                  DataCell(Text(fila['ss144h'] ?? '')),
+                                  DataCell(Text(fila['ss12h'] ?? '')),
+                                  DataCell(Text(fila['morseteriaIdentificada'] ?? '')),
+                                  DataCell(Text(fila['modelo'] ?? '')),
+                                  DataCell(Text(fila['tirrajeFleje'] ?? '')),
+                                  DataCell(Text(fila['tirrajeCantidad'] ?? '')),
+                                  DataCell(Text(fila['geolocalizacionModelo'] ?? '')),
+                                  DataCell(Text(fila['fibraPlana'] ?? '')),
+                                  DataCell(Text(fila['tendidoInicio'] ?? '')),
+                                  DataCell(Text(fila['tendidoFin'] ?? '')),
+                                  DataCell(Text(fila['reservas144hActual'] ?? '')),
+                                  DataCell(Text(fila['reservas144hAccion'] ?? '')),
+                                  DataCell(Text(fila['reservas12hActual'] ?? '')),
+                                  DataCell(Text(fila['reservas12hAccion'] ?? '')),
+                                  DataCell(Text(fila['zonasPodaInicio'] ?? '')),
+                                  DataCell(Text(fila['zonasPodaFin'] ?? '')),
+                                  DataCell(Text(fila['postesInstalados'] ?? '')),
+                                  DataCell(Text(fila['observaciones'] ?? '')),
+                                  DataCell(Text(fila['trabajosPendientes'] ?? '')),
+                                ],
+                              );
+                            }).toList(),
+                          ),
+                         ),
                       ),
                     ),
                   ),
@@ -452,7 +456,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: DropdownButtonFormField<String>(
-        value: value,
+        initialValue: value,
         decoration: InputDecoration(
           labelText: label,
           border: const OutlineInputBorder(),
