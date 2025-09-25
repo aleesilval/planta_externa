@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-// Paquetes para PDF
 import 'package:pdf/widgets.dart' as pw;
 import 'package:pdf/pdf.dart';
 import 'package:printing/printing.dart';
@@ -9,13 +8,11 @@ void main() {
   runApp(const MyApp());
 }
 
-// Widget principal de la aplicación
+// Widget principal
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
-
   @override
   Widget build(BuildContext context) {
-    // Configuración de tema y pantalla inicial
     return MaterialApp(
       title: 'Formulario Planta Externa',
       theme: ThemeData(primarySwatch: Colors.blue),
@@ -24,89 +21,67 @@ class MyApp extends StatelessWidget {
   }
 }
 
-// Widget de la pantalla principal con estado
+// Pantalla principal con estado
 class FormularioPlantaExterna extends StatefulWidget {
   const FormularioPlantaExterna({super.key});
-
   @override
   State<FormularioPlantaExterna> createState() => _FormularioPlantaExternaState();
 }
 
-// Estado del formulario y la tabla
 class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
-  final _formKey = GlobalKey<FormState>(); // Clave para el formulario
-  final Map<String, TextEditingController> _controllers = {}; // Controladores de texto
-  final List<Map<String, String>> _tabla = []; // Lista de filas de la tabla
-  int _contador = 1; // Contador de filas
+  final _formKey = GlobalKey<FormState>();
+  final List<Map<String, dynamic>> _tabla = [];
+  int _contador = 1;
 
-  // Definición de los campos del formulario
-  final List<Map<String, String>> _campos = [
-    {'label': 'Soporte de Morseteria', 'key': 'soporte_morseteria'},
-    {'label': 'Morseteria SR (Soporte de retención para F.O 12, 144H)', 'key': 'morseteria_sr'},
-    {'label': 'Morseteria SS (Soporte de Suspensión)', 'key': 'morseteria_ss'},
-    {'label': 'Morseteria identificada Color Amarillo Inter', 'key': 'morseteria_color'},
-    {'label': 'Modelo del elemento Instalado CL288, CL144, NAP: IP65, NAP: IP67', 'key': 'modelo_elemento'},
-    {'label': 'Fijación del elemento Tiraje o Fleje cantidad', 'key': 'fijacion_elemento'},
-    {'label': 'Geolocalización', 'key': 'geolocalizacion'},
-    {'label': 'Morseteria Fibra 4H', 'key': 'morseteria_fibra_4h'},
-    {'label': 'Soporte de fibra plana', 'key': 'soporte_fibra_plana'},
-    {'label': 'Tendido de Fibras con perdida de tensión Geolocalización Punto Inicial', 'key': 'tendido_fibras_inicial'},
-    {'label': 'Tendido de Fibras con perdida de tensión Geolocalización Punto Final', 'key': 'tendido_fibras_final'},
-    {'label': 'Cantidad de Reservas F.O 144H Actual', 'key': 'reservas_144h_actual'},
-    {'label': 'Cantidad de Reservas F.O 144H Acción', 'key': 'reservas_144h_accion'},
-    {'label': 'Cantidad de Reservas F.O 12H Actual', 'key': 'reservas_12h_actual'},
-    {'label': 'Cantidad de Reservas F.O 12H Acción', 'key': 'reservas_12h_accion'},
-    {'label': 'Zonas por Desmalezar o poda Geolocalización Punto Inicial', 'key': 'zonas_poda_inicial'},
-    {'label': 'Zonas por Desmalezar o poda Geolocalización Punto Final', 'key': 'zonas_poda_final'},
-    {'label': 'Postes propiedad INTER Geolocalización Instalados', 'key': 'postes_inter_instalados'},
-    {'label': 'Observaciones', 'key': 'observaciones'},
-    {'label': 'Trabajos pendientes o realizados', 'key': 'trabajos_pendientes'},
-  ];
+  // Controladores y valores de los campos
+  final TextEditingController _yk01Controller = TextEditingController();
+  final TextEditingController _sr144hController = TextEditingController();
+  final TextEditingController _sr12hController = TextEditingController();
+  final TextEditingController _ss144hController = TextEditingController();
+  final TextEditingController _ss12hController = TextEditingController();
+  String _morseteriaIdentificada = 'SS';
+  final TextEditingController _modeloController = TextEditingController();
+  String _tirrajeFleje = 'Tirraje';
+  final TextEditingController _tirrajeCantidadController = TextEditingController();
+  final TextEditingController _geolocalizacionModeloController = TextEditingController();
+  final TextEditingController _fibraPlanaController = TextEditingController();
+  final TextEditingController _tendidoInicioController = TextEditingController();
+  final TextEditingController _tendidoFinController = TextEditingController();
+  final TextEditingController _reservas144hActualController = TextEditingController();
+  final TextEditingController _reservas144hAccionController = TextEditingController();
+  final TextEditingController _reservas12hActualController = TextEditingController();
+  final TextEditingController _reservas12hAccionController = TextEditingController();
+  final TextEditingController _zonasPodaInicioController = TextEditingController();
+  final TextEditingController _zonasPodaFinController = TextEditingController();
+  final TextEditingController _postesInstaladosController = TextEditingController();
+  final TextEditingController _observacionesController = TextEditingController();
+  final TextEditingController _trabajosPendientesController = TextEditingController();
 
-  // Inicializa los controladores de texto
-  @override
-  void initState() {
-    super.initState();
-    for (var campo in _campos) {
-      _controllers[campo['key']!] = TextEditingController();
-    }
-  }
-
-  // Libera los controladores al cerrar el widget
-  @override
-  void dispose() {
-    for (var controller in _controllers.values) {
-      controller.dispose();
-    }
-    super.dispose();
-  }
-
-  // Agrega una fila a la tabla con los datos del formulario
-  void _grabarFila() {
-    if (_formKey.currentState!.validate()) {
-      Map<String, String> fila = {'N°': _contador.toString()};
-      for (var campo in _campos) {
-        fila[campo['key']!] = _controllers[campo['key']!]!.text;
-      }
-      setState(() {
-        _tabla.add(fila);
-        _contador++;
-        for (var controller in _controllers.values) {
-          controller.clear();
-        }
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Fila agregada a la tabla')),
-      );
-    }
-  }
-
-  // Limpia los campos y la tabla
+  // Limpia todos los campos y la tabla
   void _limpiarTodo() {
     setState(() {
-      for (var controller in _controllers.values) {
-        controller.clear();
-      }
+      _yk01Controller.clear();
+      _sr144hController.clear();
+      _sr12hController.clear();
+      _ss144hController.clear();
+      _ss12hController.clear();
+      _morseteriaIdentificada = 'SS';
+      _modeloController.clear();
+      _tirrajeFleje = 'Tirraje';
+      _tirrajeCantidadController.clear();
+      _geolocalizacionModeloController.clear();
+      _fibraPlanaController.clear();
+      _tendidoInicioController.clear();
+      _tendidoFinController.clear();
+      _reservas144hActualController.clear();
+      _reservas144hAccionController.clear();
+      _reservas12hActualController.clear();
+      _reservas12hAccionController.clear();
+      _zonasPodaInicioController.clear();
+      _zonasPodaFinController.clear();
+      _postesInstaladosController.clear();
+      _observacionesController.clear();
+      _trabajosPendientesController.clear();
       _tabla.clear();
       _contador = 1;
     });
@@ -115,223 +90,190 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
     );
   }
 
-  // Exporta la tabla a un PDF con formato horizontal y columnas centradas
+  // Agrega una fila a la tabla
+  void _grabarFila() {
+    if (_formKey.currentState!.validate()) {
+      setState(() {
+        _tabla.add({
+          'contador': _contador,
+          'yk01': _yk01Controller.text,
+          'sr144h': _sr144hController.text,
+          'sr12h': _sr12hController.text,
+          'ss144h': _ss144hController.text,
+          'ss12h': _ss12hController.text,
+          'morseteriaIdentificada': _morseteriaIdentificada,
+          'modelo': _modeloController.text,
+          'tirrajeFleje': _tirrajeFleje,
+          'tirrajeCantidad': _tirrajeCantidadController.text,
+          'geolocalizacionModelo': _geolocalizacionModeloController.text,
+          'fibraPlana': _fibraPlanaController.text,
+          'tendidoInicio': _tendidoInicioController.text,
+          'tendidoFin': _tendidoFinController.text,
+          'reservas144hActual': _reservas144hActualController.text,
+          'reservas144hAccion': _reservas144hAccionController.text,
+          'reservas12hActual': _reservas12hActualController.text,
+          'reservas12hAccion': _reservas12hAccionController.text,
+          'zonasPodaInicio': _zonasPodaInicioController.text,
+          'zonasPodaFin': _zonasPodaFinController.text,
+          'postesInstalados': _postesInstaladosController.text,
+          'observaciones': _observacionesController.text,
+          'trabajosPendientes': _trabajosPendientesController.text,
+        });
+        _contador++;
+        _yk01Controller.clear();
+        _sr144hController.clear();
+        _sr12hController.clear();
+        _ss144hController.clear();
+        _ss12hController.clear();
+        _modeloController.clear();
+        _tirrajeCantidadController.clear();
+        _geolocalizacionModeloController.clear();
+        _fibraPlanaController.clear();
+        _tendidoInicioController.clear();
+        _tendidoFinController.clear();
+        _reservas144hActualController.clear();
+        _reservas144hAccionController.clear();
+        _reservas12hActualController.clear();
+        _reservas12hAccionController.clear();
+        _zonasPodaInicioController.clear();
+        _zonasPodaFinController.clear();
+        _postesInstaladosController.clear();
+        _observacionesController.clear();
+        _trabajosPendientesController.clear();
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Fila agregada a la tabla')),
+      );
+    }
+  }
+
+  // Exporta la tabla a PDF
   Future<void> _exportarPDF() async {
     final pdf = pw.Document();
-
-    // Encabezados principales y secundarios de la tabla
-    final List<String> encabezados1 = [
-      'Cantidad de\nPostes en el\ntendido',
-      'Morseteria SR\n(Soporte de retención para F.O 12, 144H)',
-      'Morseteria SS\n(Soporte de Suspensión)',
-      'Morseteria\nidentificada\nColor Amarillo\nInter',
-      'Modelo del elemento Instalado CL288,\nCL144, NAP: IP65, NAP: IP67',
-      'Morseteria\nFibra 4H',
-      'Tendido de Fibras con perdida de tensión\nGeolocalización',
-      'Cantidad de Reservas\nF.O 144H',
-      'Cantidad de Reservas\nF.O 12H',
-      'Zonas por Desmalezar o poda\nGeolocalización',
-      'Postes propiedad INTER\nGeolocalización',
-      'Observaciones',
-      'Trabajos pendientes o realizados',
-    ];
-
-    final List<List<String>> encabezados2 = [
-      ['YK01'],
-      ['S.R 144H', 'SR. 12H'],
-      ['S.S 144H', 'S.S 12H'],
-      ['SS, SR, YK01'],
-      ['Modelo', 'Fijación del elemento\nTiraje o Fleje cantidad', 'Geolocalización'],
-      ['Soporte de fibra plana'],
-      ['Punto Inicial', 'Punto Final'],
-      ['Actual', 'Acción'],
-      ['Actual', 'Accion'],
-      ['Punto Inicial', 'Punto Final'],
-      ['Instalados'],
-      ['Breve Comentario'],
-      ['Breve Comentario'],
-    ];
-
-    // Construcción de la hoja PDF
     pdf.addPage(
       pw.Page(
-        pageFormat: PdfPageFormat.a4.landscape, // Orientación horizontal
+        pageFormat: PdfPageFormat.a4.landscape,
         margin: const pw.EdgeInsets.all(12),
         build: (context) {
           return pw.Column(
             children: [
-              // Título del reporte
               pw.Text('Mantenimiento Preventivo, Predictivo o Correctivo',
                   style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
               pw.SizedBox(height: 8),
-              // Tabla con encabezados y filas de datos
               pw.Table(
                 border: pw.TableBorder.all(width: 0.5, color: PdfColors.black),
                 defaultVerticalAlignment: pw.TableCellVerticalAlignment.middle,
                 columnWidths: {
-                  0: const pw.FixedColumnWidth(50),
-                  1: const pw.FixedColumnWidth(80),
-                  2: const pw.FixedColumnWidth(80),
-                  3: const pw.FixedColumnWidth(70),
-                  4: const pw.FixedColumnWidth(120),
-                  5: const pw.FixedColumnWidth(70),
-                  6: const pw.FixedColumnWidth(100),
-                  7: const pw.FixedColumnWidth(60),
-                  8: const pw.FixedColumnWidth(60),
-                  9: const pw.FixedColumnWidth(100),
-                  10: const pw.FixedColumnWidth(70),
-                  11: const pw.FixedColumnWidth(70),
-                  12: const pw.FixedColumnWidth(70),
+                  0: const pw.FlexColumnWidth(), // Dinámico
+                  1: const pw.FlexColumnWidth(),
+                  2: const pw.FlexColumnWidth(),
+                  3: const pw.FlexColumnWidth(),
+                  4: const pw.FlexColumnWidth(),
+                  5: const pw.FlexColumnWidth(),
+                  6: const pw.FlexColumnWidth(),
+                  7: const pw.FlexColumnWidth(),
+                  8: const pw.FlexColumnWidth(),
+                  9: const pw.FlexColumnWidth(),
+                  10: const pw.FlexColumnWidth(),
+                  11: const pw.FlexColumnWidth(),
+                  12: const pw.FlexColumnWidth(),
+                  13: const pw.FlexColumnWidth(),
+                  14: const pw.FlexColumnWidth(),
+                  15: const pw.FlexColumnWidth(),
+                  16: const pw.FlexColumnWidth(),
+                  17: const pw.FlexColumnWidth(),
+                  18: const pw.FlexColumnWidth(),
+                  19: const pw.FlexColumnWidth(),
+                  20: const pw.FlexColumnWidth(),
+                  21: const pw.FlexColumnWidth(),
+                  22: const pw.FlexColumnWidth(),
                 },
                 children: [
-                  // Fila de encabezados principales
+                  // Encabezados
                   pw.TableRow(
-                    children: encabezados1.map((e) {
-                      return pw.Container(
+                    children: [
+                      pw.Container(
                         alignment: pw.Alignment.center,
-                        padding: const pw.EdgeInsets.all(4),
-                        child: pw.Text(
-                          e,
-                          textAlign: pw.TextAlign.center,
-                          style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
+                        padding: const pw.EdgeInsets.all(2),
+                        child: pw.Wrap(
+                          alignment: pw.WrapAlignment.center,
+                          children: [
+                            pw.Text('Nro de poste en el tendido', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9)),
+                          ],
                         ),
-                      );
-                    }).toList(),
+                      ),
+                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('YK01', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9))),
+                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('S.R 144H', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9))),
+                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('S.R 12H', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9))),
+                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('S.S 144H', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9))),
+                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('S.S 12H', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9))),
+                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('Identificada', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9))),
+                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('Modelo', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9))),
+                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('Tirraje/Fleje', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9))),
+                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('Cantidad', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9))),
+                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('Geolocalización ', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9))),
+                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('Morseteria Fibra 4H Soporte Fibra plana', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9))),
+                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('Tendido con perdida de tension inicio', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9))),
+                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('Tendido con perdida de tensionfin', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9))),
+                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('Reservas 144H Actual', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9))),
+                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('Reservas 144H Acción', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9))),
+                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('Reservas 12H Actual', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9))),
+                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('Reservas 12H Acción', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9))),
+                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('Zonas poda inicio', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9))),
+                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('Zonas poda fin', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9))),
+                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('Postes instalados', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9))),
+                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('Observaciones', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9))),
+                      pw.Container(alignment: pw.Alignment.center, child: pw.Text('Trabajos pendientes', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9))),
+                    ],
                   ),
-                  // Fila de sub-encabezados
-                  pw.TableRow(
-                    children: encabezados2.map((sublist) {
-                      return pw.Column(
-                        children: sublist.map((sub) => pw.Container(
-                          alignment: pw.Alignment.center,
-                          padding: const pw.EdgeInsets.all(2),
-                          child: pw.Text(
-                            sub,
-                            textAlign: pw.TextAlign.center,
-                            style: const pw.TextStyle(fontSize: 8),
-                          ),
-                        )).toList(),
-                      );
-                    }).toList(),
-                  ),
-                  // Filas de datos de la tabla
+                  // Filas de datos
                   ..._tabla.map((fila) {
                     return pw.TableRow(
                       children: [
                         pw.Container(
                           alignment: pw.Alignment.center,
                           padding: const pw.EdgeInsets.all(2),
-                          child: pw.Text(fila['soporte_morseteria'] ?? '', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8)),
+                          child: pw.Wrap(
+                            alignment: pw.WrapAlignment.center,
+                            children: [
+                              pw.Text('${fila['contador']}', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8)),
+                            ],
+                          ),
                         ),
-                        pw.Column(children: [
-                          pw.Container(
-                            alignment: pw.Alignment.center,
-                            child: pw.Text(fila['morseteria_sr'] ?? '', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8)),
-                          ),
-                          pw.Container(
-                            alignment: pw.Alignment.center,
-                            child: pw.Text(fila['morseteria_sr'] ?? '', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8)),
-                          ),
-                        ]),
-                        pw.Column(children: [
-                          pw.Container(
-                            alignment: pw.Alignment.center,
-                            child: pw.Text(fila['morseteria_ss'] ?? '', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8)),
-                          ),
-                          pw.Container(
-                            alignment: pw.Alignment.center,
-                            child: pw.Text(fila['morseteria_ss'] ?? '', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8)),
-                          ),
-                        ]),
-                        pw.Container(
-                          alignment: pw.Alignment.center,
-                          child: pw.Text(fila['morseteria_color'] ?? '', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8)),
-                        ),
-                        pw.Column(children: [
-                          pw.Container(
-                            alignment: pw.Alignment.center,
-                            child: pw.Text(fila['modelo_elemento'] ?? '', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8)),
-                          ),
-                          pw.Container(
-                            alignment: pw.Alignment.center,
-                            child: pw.Text(fila['fijacion_elemento'] ?? '', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8)),
-                          ),
-                          pw.Container(
-                            alignment: pw.Alignment.center,
-                            child: pw.Text(fila['geolocalizacion'] ?? '', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8)),
-                          ),
-                        ]),
-                        pw.Container(
-                          alignment: pw.Alignment.center,
-                          child: pw.Text(fila['morseteria_fibra_4h'] ?? '', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8)),
-                        ),
-                        pw.Column(children: [
-                          pw.Container(
-                            alignment: pw.Alignment.center,
-                            child: pw.Text(fila['tendido_fibras_inicial'] ?? '', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8)),
-                          ),
-                          pw.Container(
-                            alignment: pw.Alignment.center,
-                            child: pw.Text(fila['tendido_fibras_final'] ?? '', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8)),
-                          ),
-                        ]),
-                        pw.Column(children: [
-                          pw.Container(
-                            alignment: pw.Alignment.center,
-                            child: pw.Text(fila['reservas_144h_actual'] ?? '', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8)),
-                          ),
-                          pw.Container(
-                            alignment: pw.Alignment.center,
-                            child: pw.Text(fila['reservas_144h_accion'] ?? '', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8)),
-                          ),
-                        ]),
-                        pw.Column(children: [
-                          pw.Container(
-                            alignment: pw.Alignment.center,
-                            child: pw.Text(fila['reservas_12h_actual'] ?? '', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8)),
-                          ),
-                          pw.Container(
-                            alignment: pw.Alignment.center,
-                            child: pw.Text(fila['reservas_12h_accion'] ?? '', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8)),
-                          ),
-                        ]),
-                        pw.Column(children: [
-                          pw.Container(
-                            alignment: pw.Alignment.center,
-                            child: pw.Text(fila['zonas_poda_inicial'] ?? '', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8)),
-                          ),
-                          pw.Container(
-                            alignment: pw.Alignment.center,
-                            child: pw.Text(fila['zonas_poda_final'] ?? '', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8)),
-                          ),
-                        ]),
-                        pw.Container(
-                          alignment: pw.Alignment.center,
-                          child: pw.Text(fila['postes_inter_instalados'] ?? '', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8)),
-                        ),
-                        pw.Container(
-                          alignment: pw.Alignment.center,
-                          child: pw.Text(fila['observaciones'] ?? '', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8)),
-                        ),
-                        pw.Container(
-                          alignment: pw.Alignment.center,
-                          child: pw.Text(fila['trabajos_pendientes'] ?? '', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8)),
-                        ),
+                        pw.Container(alignment: pw.Alignment.center, child: pw.Text(fila['yk01'] ?? '', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8))),
+                        pw.Container(alignment: pw.Alignment.center, child: pw.Text(fila['sr144h'] ?? '', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8))),
+                        pw.Container(alignment: pw.Alignment.center, child: pw.Text(fila['sr12h'] ?? '', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8))),
+                        pw.Container(alignment: pw.Alignment.center, child: pw.Text(fila['ss144h'] ?? '', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8))),
+                        pw.Container(alignment: pw.Alignment.center, child: pw.Text(fila['ss12h'] ?? '', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8))),
+                        pw.Container(alignment: pw.Alignment.center, child: pw.Text(fila['morseteriaIdentificada'] ?? '', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8))),
+                        pw.Container(alignment: pw.Alignment.center, child: pw.Text(fila['modelo'] ?? '', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8))),
+                        pw.Container(alignment: pw.Alignment.center, child: pw.Text(fila['tirrajeFleje'] ?? '', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8))),
+                        pw.Container(alignment: pw.Alignment.center, child: pw.Text(fila['tirrajeCantidad'] ?? '', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8))),
+                        pw.Container(alignment: pw.Alignment.center, child: pw.Text(fila['geolocalizacionModelo'] ?? '', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8))),
+                        pw.Container(alignment: pw.Alignment.center, child: pw.Text(fila['fibraPlana'] ?? '', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8))),
+                        pw.Container(alignment: pw.Alignment.center, child: pw.Text(fila['tendidoInicio'] ?? '', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8))),
+                        pw.Container(alignment: pw.Alignment.center, child: pw.Text(fila['tendidoFin'] ?? '', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8))),
+                        pw.Container(alignment: pw.Alignment.center, child: pw.Text(fila['reservas144hActual'] ?? '', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8))),
+                        pw.Container(alignment: pw.Alignment.center, child: pw.Text(fila['reservas144hAccion'] ?? '', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8))),
+                        pw.Container(alignment: pw.Alignment.center, child: pw.Text(fila['reservas12hActual'] ?? '', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8))),
+                        pw.Container(alignment: pw.Alignment.center, child: pw.Text(fila['reservas12hAccion'] ?? '', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8))),
+                        pw.Container(alignment: pw.Alignment.center, child: pw.Text(fila['zonasPodaInicio'] ?? '', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8))),
+                        pw.Container(alignment: pw.Alignment.center, child: pw.Text(fila['zonasPodaFin'] ?? '', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8))),
+                        pw.Container(alignment: pw.Alignment.center, child: pw.Text(fila['postesInstalados'] ?? '', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8))),
+                        pw.Container(alignment: pw.Alignment.center, child: pw.Text(fila['observaciones'] ?? '', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8))),
+                        pw.Container(alignment: pw.Alignment.center, child: pw.Text(fila['trabajosPendientes'] ?? '', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8))),
                       ],
                     );
                   }).toList(),
                 ],
               ),
               pw.SizedBox(height: 12),
-              // Muestra el total de registros
               pw.Text('Total de registros: ${_tabla.length}', style: pw.TextStyle(fontSize: 12)),
             ],
           );
         },
       ),
     );
-
-    // Muestra el PDF usando Printing
     await Printing.layoutPdf(
       onLayout: (PdfPageFormat format) async => pdf.save(),
     );
@@ -342,93 +284,182 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Formulario Planta Externa')),
-      body: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Form(
-          key: _formKey,
-          child: ListView(
-            children: [
-              // Genera los campos del formulario
-              ..._campos.map((campo) => _buildFila(campo['label']!, campo['key']!)),
-              const SizedBox(height: 16),
-              // Botones de acción
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      body: Column(
+        children: [
+          Expanded(
+            flex: 2,
+            child: Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Form(
+                key: _formKey,
+                child: ListView(
+                  children: [
+                    // Campos de ingreso agrupados y personalizados
+                    _buildTextField('Cantidad de YK01', _yk01Controller),
+                    _buildTextField('S.R 144H', _sr144hController),
+                    _buildTextField('S.R 12H', _sr12hController),
+                    _buildTextField('S.S 144H', _ss144hController),
+                    _buildTextField('S.S 12H', _ss12hController),
+                    _buildDropdownField('Identificada', _morseteriaIdentificada, ['SS', 'SR', 'YK01'], (val) {
+                      setState(() { _morseteriaIdentificada = val!; });
+                    }),
+                    _buildTextField('Modelo de elemento de fijacion', _modeloController),
+                    _buildDropdownField('Tirraje/Fleje', _tirrajeFleje, ['Tirraje', 'Fleje'], (val) {
+                      setState(() { _tirrajeFleje = val!; });
+                    }),
+                    _buildTextField('Cantidad de elementos de fijacion', _tirrajeCantidadController),
+                    _buildTextField('Geolocalización del elemento fijado ', _geolocalizacionModeloController),
+                    _buildTextField('Morseteria Fibra de 4H Soporte de Fibra plana', _fibraPlanaController),
+                    _buildTextField('Tendido con perdida de tension Geolocalizacion inicio', _tendidoInicioController),
+                    _buildTextField('Tendido con perdida de tension Geolocalizacion fin', _tendidoFinController),
+                    _buildTextField('Reservas 144H Actual', _reservas144hActualController),
+                    _buildTextField('Reservas 144H Acción', _reservas144hAccionController),
+                    _buildTextField('Reservas 12H Actual', _reservas12hActualController),
+                    _buildTextField('Reservas 12H Acción', _reservas12hAccionController),
+                    _buildTextField('Geolocalizacion de zona poda inicio', _zonasPodaInicioController),
+                    _buildTextField('Geolocalizacion de zona poda fin', _zonasPodaFinController),
+                    _buildTextField('Postes propiedad de Inter instalados', _postesInstaladosController),
+                    _buildTextField('Observaciones', _observacionesController),
+                    _buildTextField('Trabajos pendientes', _trabajosPendientesController),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.add),
+                          label: const Text('Grabar'),
+                          onPressed: _grabarFila,
+                        ),
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.picture_as_pdf),
+                          label: const Text('Exportar'),
+                          onPressed: _tabla.isEmpty ? null : _exportarPDF,
+                        ),
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.cleaning_services),
+                          label: const Text('Limpiar'),
+                          onPressed: _limpiarTodo,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          // Sección inferior separada y con scroll independiente
+          Expanded(
+            flex: 1,
+            child: Container(
+              color: Colors.grey[100],
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  ElevatedButton.icon(
-                    icon: const Icon(Icons.add),
-                    label: const Text('Grabar'),
-                    onPressed: _grabarFila,
+                  const Padding(
+                    padding: EdgeInsets.all(8.0),
+                    child: Text('Tabla de datos:', style: TextStyle(fontWeight: FontWeight.bold)),
                   ),
-                  ElevatedButton.icon(
-                    icon: const Icon(Icons.picture_as_pdf),
-                    label: const Text('Exportar'),
-                    onPressed: _tabla.isEmpty ? null : _exportarPDF,
-                  ),
-                  ElevatedButton.icon(
-                    icon: const Icon(Icons.cleaning_services),
-                    label: const Text('Limpiar'),
-                    onPressed: _limpiarTodo,
+                  Expanded(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.vertical,
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: DataTable(
+                          columns: [
+                            DataColumn(label: Text('Nro de poste en el tendido')),
+                            DataColumn(label: Text('YK01')),
+                            DataColumn(label: Text('S.R 144H')),
+                            DataColumn(label: Text('S.R 12H')),
+                            DataColumn(label: Text('S.S 144H')),
+                            DataColumn(label: Text('S.S 12H')),
+                            DataColumn(label: Text('Identificada')),
+                            DataColumn(label: Text('Modelo')),
+                            DataColumn(label: Text('Tirraje/Fleje')),
+                            DataColumn(label: Text('Cantidad')),
+                            DataColumn(label: Text('Geolocalización Modelo')),
+                            DataColumn(label: Text('Fibra plana')),
+                            DataColumn(label: Text('Tendido inicio')),
+                            DataColumn(label: Text('Tendido fin')),
+                            DataColumn(label: Text('Reservas 144H Actual')),
+                            DataColumn(label: Text('Reservas 144H Acción')),
+                            DataColumn(label: Text('Reservas 12H Actual')),
+                            DataColumn(label: Text('Reservas 12H Acción')),
+                            DataColumn(label: Text('Zonas poda inicio')),
+                            DataColumn(label: Text('Zonas poda fin')),
+                            DataColumn(label: Text('Postes instalados')),
+                            DataColumn(label: Text('Observaciones')),
+                            DataColumn(label: Text('Trabajos pendientes')),
+                          ],
+                          rows: _tabla.map((fila) {
+                            return DataRow(
+                              cells: [
+                                DataCell(Text('${fila['contador']}')),
+                                DataCell(Text(fila['yk01'] ?? '')),
+                                DataCell(Text(fila['sr144h'] ?? '')),
+                                DataCell(Text(fila['sr12h'] ?? '')),
+                                DataCell(Text(fila['ss144h'] ?? '')),
+                                DataCell(Text(fila['ss12h'] ?? '')),
+                                DataCell(Text(fila['morseteriaIdentificada'] ?? '')),
+                                DataCell(Text(fila['modelo'] ?? '')),
+                                DataCell(Text(fila['tirrajeFleje'] ?? '')),
+                                DataCell(Text(fila['tirrajeCantidad'] ?? '')),
+                                DataCell(Text(fila['geolocalizacionModelo'] ?? '')),
+                                DataCell(Text(fila['fibraPlana'] ?? '')),
+                                DataCell(Text(fila['tendidoInicio'] ?? '')),
+                                DataCell(Text(fila['tendidoFin'] ?? '')),
+                                DataCell(Text(fila['reservas144hActual'] ?? '')),
+                                DataCell(Text(fila['reservas144hAccion'] ?? '')),
+                                DataCell(Text(fila['reservas12hActual'] ?? '')),
+                                DataCell(Text(fila['reservas12hAccion'] ?? '')),
+                                DataCell(Text(fila['zonasPodaInicio'] ?? '')),
+                                DataCell(Text(fila['zonasPodaFin'] ?? '')),
+                                DataCell(Text(fila['postesInstalados'] ?? '')),
+                                DataCell(Text(fila['observaciones'] ?? '')),
+                                DataCell(Text(fila['trabajosPendientes'] ?? '')),
+                              ],
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
-              // Muestra la tabla en pantalla
-              const Text('Tabla de datos:', style: TextStyle(fontWeight: FontWeight.bold)),
-              _tabla.isEmpty
-                  ? const Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: Text('No hay datos en la tabla'),
-                    )
-                  : SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: DataTable(
-                        columns: [
-                          const DataColumn(label: Text('N°')),
-                          ..._campos.map((c) => DataColumn(label: Text(c['label']!))),
-                        ],
-                        rows: _tabla.map((fila) {
-                          return DataRow(
-                            cells: [
-                              DataCell(Text(fila['N°'] ?? '')),
-                              ..._campos.map((c) => DataCell(Text(fila[c['key']] ?? ''))),
-                            ],
-                          );
-                        }).toList(),
-                      ),
-                    ),
-            ],
+            ),
           ),
+        ],
+      ),
+    );
+  }
+
+  // Campo de texto estándar
+  Widget _buildTextField(String label, TextEditingController controller) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: TextFormField(
+        controller: controller,
+        decoration: InputDecoration(
+          labelText: label,
+          border: const OutlineInputBorder(),
+          isDense: true,
         ),
       ),
     );
   }
 
-  // Genera una fila de entrada de texto para el formulario
-  Widget _buildFila(String label, String key) {
+  // Campo de selección tipo dropdown
+  Widget _buildDropdownField(String label, String value, List<String> items, ValueChanged<String?> onChanged) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            flex: 2,
-            child: Text(label, style: const TextStyle(fontSize: 13)),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            flex: 2,
-            child: TextFormField(
-              controller: _controllers[key],
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                isDense: true,
-                contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-              ),
-              validator: (value) => null, // Puedes agregar validaciones si lo deseas
-            ),
-          ),
-        ],
+      child: DropdownButtonFormField<String>(
+        value: value,
+        decoration: InputDecoration(
+          labelText: label,
+          border: const OutlineInputBorder(),
+          isDense: true,
+        ),
+        items: items.map((item) => DropdownMenuItem(value: item, child: Text(item))).toList(),
+        onChanged: onChanged,
       ),
     );
   }
