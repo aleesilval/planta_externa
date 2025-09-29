@@ -40,9 +40,9 @@ class _WelcomePageState extends State<WelcomePage> {
             DropdownButton<int>(
               value: _selectedPlanilla,
               items: const [
-                DropdownMenuItem(value: 1, child: Text('Planilla Principal')),
-                DropdownMenuItem(value: 2, child: Text('Planilla Secundaria')),
-                DropdownMenuItem(value: 3, child: Text('Planilla Tercera')),
+                DropdownMenuItem(value: 1, child: Text('Auditoria de Mantenimiento ')),
+                DropdownMenuItem(value: 2, child: Text('Planilla 2')),
+                DropdownMenuItem(value: 3, child: Text('Planilla 3')),
               ],
               onChanged: (val) => setState(() => _selectedPlanilla = val ?? 1),
             ),
