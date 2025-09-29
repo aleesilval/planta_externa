@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:pdf/pdf.dart';
 import 'package:printing/printing.dart';
+import 'package:planta_externa/geo_field.dart';
 
 void main() {
   runApp(const FormularioPage());
@@ -357,7 +358,10 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                       setState(() { _elementoFijacion = val!; });
                     }),
                     _buildTextField('Cantidad', _cantidadElementoController),
-                    _buildTextField('Geolocalización del elemento fijado', _geolocalizacionElementoController),
+                    GeoField(
+                      controller: _geolocalizacionElementoController,
+                      label: 'Geolocalización del elemento fijado',
+                    ),
                     _buildTextField('Tendido con perdida de tensión Geolocalización inicio', _tendidoInicioController),
                     _buildTextField('Tendido con perdida de tensión Geolocalización fin', _tendidoFinController),
                     if (_tipoCable == 'Cable alimentador') ...[

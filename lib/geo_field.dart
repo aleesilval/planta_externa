@@ -19,21 +19,84 @@ class GeoField extends StatefulWidget {
 }
 
 class _GeoFieldState extends State<GeoField> {
+  Future<bool> _ensurePermission() async {
+    // Verificar que los servicios de ubicación estén activos
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Activa los servicios de ubicación (GPS).')),
+        );
+      }
+      return false;
+    }
+
+    // Verificar y solicitar permisos
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+    if (permission == LocationPermission.deniedForever) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Permiso de ubicación denegado permanentemente. Habilítalo en Ajustes.')),
+        );
+      }
+      return false;
+    }
+    if (permission == LocationPermission.denied) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Se requiere permiso de ubicación para continuar.')),
+        );
+      }
+      return false;
+    }
+    return true;
+  }
+
+  Future<void> _getCurrentLocation() async {
+    if (!widget.enabled) return;
+    final hasPerm = await _ensurePermission();
+    if (!hasPerm) return;
+
+    try {
+      final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      final lat = pos.latitude.toStringAsFixed(6);
+      final lng = pos.longitude.toStringAsFixed(6);
+      widget.controller.text = "$lat,$lng";
+      if (mounted) setState(() {});
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('No se pudo obtener la ubicación: $e')),
+        );
+      }
+    }
+  }
+
   Future<void> _openMap() async {
+    if (!widget.enabled) return;
     Position? current;
     try {
-      current = await Geolocator.getCurrentPosition();
+      final hasPerm = await _ensurePermission();
+      if (!hasPerm) {
+        current = null;
+      } else {
+        current = await Geolocator.getCurrentPosition();
+      }
     } catch (_) {
       current = null;
     }
+
     LatLng initial = current != null
         ? LatLng(current.latitude, current.longitude)
-        : const LatLng(10.5, -66.9); // default fallback
+        : const LatLng(10.500000, -66.900000); // Fallback
 
     LatLng? picked = await showDialog<LatLng>(
       context: context,
       builder: (context) {
-        LatLng? selected = initial;
+        LatLng selected = initial;
         return AlertDialog(
           title: const Text('Seleccione ubicación'),
           content: SizedBox(
@@ -58,18 +121,21 @@ class _GeoFieldState extends State<GeoField> {
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancelar")),
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
             ElevatedButton(
               onPressed: () => Navigator.pop(context, selected),
-              child: const Text("Usar ubicación"),
+              child: const Text('Usar ubicación'),
             ),
           ],
         );
       },
     );
+
     if (picked != null) {
-      widget.controller.text = "${picked.latitude},${picked.longitude}";
-      setState(() {});
+      final lat = picked.latitude.toStringAsFixed(6);
+      final lng = picked.longitude.toStringAsFixed(6);
+      widget.controller.text = "$lat,$lng";
+      if (mounted) setState(() {});
     }
   }
 
@@ -84,14 +150,24 @@ class _GeoFieldState extends State<GeoField> {
           labelText: widget.label,
           border: const OutlineInputBorder(),
           isDense: true,
-          suffixIcon: IconButton(
-            icon: const Icon(Icons.map, color: Colors.blueAccent),
-            onPressed: widget.enabled ? _openMap : null,
-            tooltip: 'Seleccionar en mapa',
+          suffixIcon: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.my_location, color: Colors.green),
+                onPressed: widget.enabled ? _getCurrentLocation : null,
+                tooltip: 'Usar GPS',
+              ),
+              IconButton(
+                icon: const Icon(Icons.map, color: Colors.blueAccent),
+                onPressed: widget.enabled ? _openMap : null,
+                tooltip: 'Seleccionar en mapa',
+              ),
+            ],
           ),
         ),
         readOnly: true,
-        onTap: widget.enabled ? _openMap : null,
+        onTap: widget.enabled ? _getCurrentLocation : null,
       ),
     );
   }
