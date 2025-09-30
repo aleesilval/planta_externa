@@ -21,7 +21,6 @@ Future<bool> generateAndCompressReport({
   required BuildContext context,
 }) async {
   try {
-    // 1. Generar PDF vertical carta
     final pdf = pw.Document();
     pdf.addPage(
       pw.Page(
@@ -49,19 +48,15 @@ Future<bool> generateAndCompressReport({
       ),
     );
 
-    // 2. Guardar temporal el PDF
     final tempDir = await getTemporaryDirectory();
     final pdfPath = '${tempDir.path}/reporte.pdf';
     final pdfFile = File(pdfPath);
     await pdfFile.writeAsBytes(await pdf.save());
 
-    // 3. Preparar archivos a comprimir
     final archive = Archive();
 
-    // Añadir PDF
     archive.addFile(ArchiveFile('Reporte_$nomenclatura.pdf', await pdfFile.length(), await pdfFile.readAsBytes()));
 
-    // Añadir fotos, renombradas por sección y número
     for (final entry in fotosPorSeccion.entries) {
       final seccion = entry.key;
       for (int i = 0; i < entry.value.length; i++) {
@@ -76,7 +71,6 @@ Future<bool> generateAndCompressReport({
       }
     }
 
-    // 4. Guardar ZIP en carpeta Descargas
     final downloadsDir = await getDownloadsDirectory();
     final zipPath = '${downloadsDir!.path}/Reporte_${nomenclatura.isNotEmpty ? nomenclatura : DateTime.now().millisecondsSinceEpoch}.zip';
     final zipFile = File(zipPath);
@@ -84,7 +78,6 @@ Future<bool> generateAndCompressReport({
 
     return true;
   } catch (e) {
-    // Manejo de error básico, opcional: mostrar dialogo de error
     return false;
   }
 }

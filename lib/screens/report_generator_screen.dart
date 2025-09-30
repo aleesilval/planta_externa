@@ -21,8 +21,44 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
   String? _elementoSeleccionado;
   final List<String> _elementos = ['FDT', 'Closure', 'NAP'];
 
-  // Campos dinámicos (según selección)
-  Map<String, TextEditingController> _camposDinamicos = {};
+  // Campos de nomenclatura para cada tipo
+  final Map<String, TextEditingController> _napCampos = {
+    'FDT padre': TextEditingController(),
+    'Nro Distribución Secundario': TextEditingController(),
+    'Nro de NAP': TextEditingController(),
+  };
+
+  final Map<String, TextEditingController> _fdtCamposNo = {
+    'Closure padre': TextEditingController(),
+    'Distribucion': TextEditingController(),
+    'Nro FDT': TextEditingController(),
+  };
+
+  final Map<String, TextEditingController> _fdtCamposSi = {
+    'Closure Secundario padre': TextEditingController(),
+    'Distribucion': TextEditingController(),
+    'Numero de FDT': TextEditingController(),
+  };
+
+  final Map<String, TextEditingController> _closureDistribucionCampos = {
+    'Feeder': TextEditingController(),
+    'Nro Closure': TextEditingController(),
+  };
+
+  final Map<String, TextEditingController> _closureSecundarioCampos = {
+    'Closure padre': TextEditingController(),
+    'Distribucion': TextEditingController(),
+    'Closure secundario': TextEditingController(),
+  };
+
+  final Map<String, TextEditingController> _closureContinuidadCampos = {
+    'Nro Closure': TextEditingController(),
+  };
+
+  final Map<String, TextEditingController> _closureReparacionCampos = {
+    'Nro Closure de reparacion': TextEditingController(),
+  };
+
   String? _closureNaturaleza;
   String? _fdtConClosureSecundario;
 
@@ -49,26 +85,43 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
       setState(() {
         _ubicacionActual = pos;
       });
-    } catch (e) {
-      // Manejo básico de error de ubicación
-    }
+    } catch (e) {}
   }
 
   void _actualizarNomenclatura() {
-    // LOGICA para generar la nomenclatura según la selección y campos
-    // (Ver archivo aparte para mantener limpio si crece)
     setState(() {
-      _nomenclatura = obtenerNomenclatura(
-        elemento: _elementoSeleccionado,
-        closureNaturaleza: _closureNaturaleza,
-        fdtConClosureSecundario: _fdtConClosureSecundario,
-        campos: _camposDinamicos.map((k, v) => MapEntry(k, v.text)),
-      );
+      _nomenclatura = _getNomenclatura();
     });
   }
 
+  String _getNomenclatura() {
+    switch (_elementoSeleccionado) {
+      case "NAP":
+        return "M${_napCampos['FDT padre']?.text ?? ""}-CS${_napCampos['Nro Distribución Secundario']?.text ?? ""}-M${_napCampos['Nro de NAP']?.text ?? ""}";
+      case "Closure":
+        switch (_closureNaturaleza) {
+          case "Distribucion":
+            return "${_closureDistribucionCampos['Feeder']?.text ?? ""}-CL${_closureDistribucionCampos['Nro Closure']?.text ?? ""}";
+          case "Secundario":
+            return "CL${_closureSecundarioCampos['Closure padre']?.text ?? ""}-D${_closureSecundarioCampos['Distribucion']?.text ?? ""}-CLS${_closureSecundarioCampos['Closure secundario']?.text ?? ""}";
+          case "Continuidad":
+            return "CLC${_closureContinuidadCampos['Nro Closure']?.text ?? ""}";
+          case "Reparacion":
+            return "CLR${_closureReparacionCampos['Nro Closure de reparacion']?.text ?? ""}";
+        }
+        break;
+      case "FDT":
+        if (_fdtConClosureSecundario == "No") {
+          return "CL${_fdtCamposNo['Closure padre']?.text ?? ""}-D${_fdtCamposNo['Distribucion']?.text ?? ""}-M${_fdtCamposNo['Nro FDT']?.text ?? ""}";
+        } else if (_fdtConClosureSecundario == "Si") {
+          return "CLS${_fdtCamposSi['Closure Secundario padre']?.text ?? ""}-D${_fdtCamposSi['Distribucion']?.text ?? ""}-M${_fdtCamposSi['Numero de FDT']?.text ?? ""}";
+        }
+        break;
+    }
+    return "";
+  }
+
   List<String> _seccionesFotos() {
-    // Devuelve las secciones de adjuntos según selección
     if (_elementoSeleccionado == "NAP") {
       return [
         "Etiquetas del elemento",
@@ -125,13 +178,11 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
 
   Widget _buildCamposDinamicos() {
     List<Widget> campos = [];
-    _camposDinamicos.clear();
-
     if (_elementoSeleccionado == "NAP") {
       campos.addAll([
-        _buildCampo("Numero de FDT"),
-        _buildCampo("Numero de cable secundario"),
-        _buildCampo("Numero de NAP"),
+        _buildCampoNomenclatura(_napCampos, 'FDT padre', "FDT padre"),
+        _buildCampoNomenclatura(_napCampos, 'Nro Distribución Secundario', "Nro Distribución Secundario"),
+        _buildCampoNomenclatura(_napCampos, 'Nro de NAP', "Nro de NAP"),
       ]);
     } else if (_elementoSeleccionado == "Closure") {
       campos.add(
@@ -149,24 +200,24 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
               _actualizarNomenclatura();
             });
           },
-          decoration: InputDecoration(labelText: "Naturaleza"),
+          decoration: const InputDecoration(labelText: "Naturaleza"),
         ),
       );
       if (_closureNaturaleza == "Distribucion") {
         campos.addAll([
-          _buildCampo("Feeder"),
-          _buildCampo("Nro Closure"),
+          _buildCampoNomenclatura(_closureDistribucionCampos, 'Feeder', "Feeder"),
+          _buildCampoNomenclatura(_closureDistribucionCampos, 'Nro Closure', "Nro Closure"),
         ]);
       } else if (_closureNaturaleza == "Secundario") {
         campos.addAll([
-          _buildCampo("Closure padre"),
-          _buildCampo("Distribucion"),
-          _buildCampo("Closure secundario"),
+          _buildCampoNomenclatura(_closureSecundarioCampos, 'Closure padre', "Closure padre"),
+          _buildCampoNomenclatura(_closureSecundarioCampos, 'Distribucion', "Distribucion"),
+          _buildCampoNomenclatura(_closureSecundarioCampos, 'Closure secundario', "Closure secundario"),
         ]);
       } else if (_closureNaturaleza == "Continuidad") {
-        campos.add(_buildCampo("Nro Closure"));
+        campos.add(_buildCampoNomenclatura(_closureContinuidadCampos, 'Nro Closure', "Nro Closure"));
       } else if (_closureNaturaleza == "Reparacion") {
-        campos.add(_buildCampo("Nro Closure de reparacion"));
+        campos.add(_buildCampoNomenclatura(_closureReparacionCampos, 'Nro Closure de reparacion', "Nro Closure de reparacion"));
       }
     } else if (_elementoSeleccionado == "FDT") {
       campos.add(
@@ -179,34 +230,35 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
               _actualizarNomenclatura();
             });
           },
-          decoration: InputDecoration(labelText: "¿Con closure secundario?"),
+          decoration: const InputDecoration(labelText: "¿Con closure secundario?"),
         ),
       );
       if (_fdtConClosureSecundario == "No") {
         campos.addAll([
-          _buildCampo("Closure padre"),
-          _buildCampo("Distribucion"),
-          _buildCampo("Nro FDT"),
+          _buildCampoNomenclatura(_fdtCamposNo, 'Closure padre', "Closure padre"),
+          _buildCampoNomenclatura(_fdtCamposNo, 'Distribucion', "Distribucion"),
+          _buildCampoNomenclatura(_fdtCamposNo, 'Nro FDT', "Nro FDT"),
         ]);
       } else if (_fdtConClosureSecundario == "Si") {
         campos.addAll([
-          _buildCampo("Closure Secundario padre"),
-          _buildCampo("Distribucion"),
-          _buildCampo("Numero de FDT"),
+          _buildCampoNomenclatura(_fdtCamposSi, 'Closure Secundario padre', "Closure Secundario padre"),
+          _buildCampoNomenclatura(_fdtCamposSi, 'Distribucion', "Distribucion"),
+          _buildCampoNomenclatura(_fdtCamposSi, 'Numero de FDT', "Numero de FDT"),
         ]);
       }
     }
     return Column(children: campos);
   }
 
-  Widget _buildCampo(String label) {
-    final controller = _camposDinamicos.putIfAbsent(label, () => TextEditingController());
+  Widget _buildCampoNomenclatura(Map<String, TextEditingController> map, String key, String label) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: TextField(
-        controller: controller,
+        controller: map[key],
         decoration: InputDecoration(labelText: label),
         onChanged: (_) => _actualizarNomenclatura(),
+        maxLines: null,
+        keyboardType: TextInputType.multiline,
       ),
     );
   }
@@ -225,9 +277,8 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
   }
 
   Widget _buildFotosSeccion() {
-    // Pestañas retraíbles por sección
     final secciones = _seccionesFotos();
-    if (secciones.isEmpty) return SizedBox.shrink();
+    if (secciones.isEmpty) return const SizedBox.shrink();
     return Column(
       children: secciones.map((seccion) {
         final expanded = _seccionesExpand[seccion] ?? false;
@@ -247,7 +298,7 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
                 child: const Text("Adjuntar Fotos"),
               ),
               ...fotos.asMap().entries.map((entry) => ListTile(
-                    title: Text("${seccion}_${entry.key + 1}.${entry.value.extension}"),
+                    title: Text("${seccion.replaceAll(" ", "_")}_${entry.key + 1}.${entry.value.extension}"),
                   )),
             ],
           ),
@@ -258,6 +309,57 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
 
   Future<void> _generarYComprimirReporte() async {
     setState(() => _generando = true);
+
+    // Recopilar los campos para enviar a la lógica
+    Map<String, String> campos = {};
+    if (_elementoSeleccionado == "NAP") {
+      campos = {
+        "FDT padre": _napCampos['FDT padre']?.text ?? "",
+        "Nro Distribución Secundario": _napCampos['Nro Distribución Secundario']?.text ?? "",
+        "Nro de NAP": _napCampos['Nro de NAP']?.text ?? "",
+      };
+    } else if (_elementoSeleccionado == "FDT") {
+      if (_fdtConClosureSecundario == "No") {
+        campos = {
+          "Closure padre": _fdtCamposNo['Closure padre']?.text ?? "",
+          "Distribucion": _fdtCamposNo['Distribucion']?.text ?? "",
+          "Nro FDT": _fdtCamposNo['Nro FDT']?.text ?? "",
+        };
+      } else if (_fdtConClosureSecundario == "Si") {
+        campos = {
+          "Closure Secundario padre": _fdtCamposSi['Closure Secundario padre']?.text ?? "",
+          "Distribucion": _fdtCamposSi['Distribucion']?.text ?? "",
+          "Numero de FDT": _fdtCamposSi['Numero de FDT']?.text ?? "",
+        };
+      }
+    } else if (_elementoSeleccionado == "Closure") {
+      switch (_closureNaturaleza) {
+        case "Distribucion":
+          campos = {
+            "Feeder": _closureDistribucionCampos['Feeder']?.text ?? "",
+            "Nro Closure": _closureDistribucionCampos['Nro Closure']?.text ?? "",
+          };
+          break;
+        case "Secundario":
+          campos = {
+            "Closure padre": _closureSecundarioCampos['Closure padre']?.text ?? "",
+            "Distribucion": _closureSecundarioCampos['Distribucion']?.text ?? "",
+            "Closure secundario": _closureSecundarioCampos['Closure secundario']?.text ?? "",
+          };
+          break;
+        case "Continuidad":
+          campos = {
+            "Nro Closure": _closureContinuidadCampos['Nro Closure']?.text ?? "",
+          };
+          break;
+        case "Reparacion":
+          campos = {
+            "Nro Closure de reparacion": _closureReparacionCampos['Nro Closure de reparacion']?.text ?? "",
+          };
+          break;
+      }
+    }
+
     final success = await generateAndCompressReport(
       instalador: _instaladorController.text,
       fecha: _fechaActual,
@@ -266,7 +368,7 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
       elemento: _elementoSeleccionado,
       closureNaturaleza: _closureNaturaleza,
       fdtConClosureSecundario: _fdtConClosureSecundario,
-      campos: _camposDinamicos.map((k, v) => MapEntry(k, v.text)),
+      campos: campos,
       nomenclatura: _nomenclatura,
       fotosPorSeccion: _fotosPorSeccion,
       context: context,
@@ -281,7 +383,7 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
             ? "Reporte generado y comprimido con éxito en la carpeta Descargas."
             : "Hubo un error al generar el reporte."),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: Text("OK")),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK")),
         ],
       ),
     );
@@ -299,6 +401,8 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
             TextField(
               controller: _instaladorController,
               decoration: const InputDecoration(labelText: "Instalador"),
+              maxLines: null,
+              keyboardType: TextInputType.multiline,
             ),
             const SizedBox(height: 8),
             Text("Fecha actual: ${_fechaActual.toLocal()}"),
@@ -308,6 +412,8 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
             TextField(
               controller: _unidadNegocioController,
               decoration: const InputDecoration(labelText: "Unidad de Negocios"),
+              maxLines: null,
+              keyboardType: TextInputType.multiline,
             ),
             const SizedBox(height: 16),
 
@@ -318,13 +424,21 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
               onChanged: (val) {
                 setState(() {
                   _elementoSeleccionado = val;
+                  // Reset dependientes
                   _closureNaturaleza = null;
                   _fdtConClosureSecundario = null;
-                  _camposDinamicos.clear();
+                  // Limpiar campos
+                  _napCampos.values.forEach((ctrl) => ctrl.clear());
+                  _fdtCamposNo.values.forEach((ctrl) => ctrl.clear());
+                  _fdtCamposSi.values.forEach((ctrl) => ctrl.clear());
+                  _closureDistribucionCampos.values.forEach((ctrl) => ctrl.clear());
+                  _closureSecundarioCampos.values.forEach((ctrl) => ctrl.clear());
+                  _closureContinuidadCampos.values.forEach((ctrl) => ctrl.clear());
+                  _closureReparacionCampos.values.forEach((ctrl) => ctrl.clear());
                   _fotosPorSeccion.clear();
                   _seccionesExpand.clear();
+                  _nomenclatura = "";
                 });
-                _actualizarNomenclatura();
               },
               decoration: const InputDecoration(labelText: "Elemento"),
             ),
@@ -336,7 +450,7 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
 
             // Nomenclatura generada
             if (_nomenclatura.isNotEmpty)
-              Text("Nomenclatura: $_nomenclatura", style: TextStyle(fontWeight: FontWeight.bold)),
+              Text("Nomenclatura: $_nomenclatura", style: const TextStyle(fontWeight: FontWeight.bold)),
 
             const SizedBox(height: 16),
 
@@ -345,7 +459,7 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
 
             const SizedBox(height: 16),
             ElevatedButton.icon(
-              icon: _generando ? SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : Icon(Icons.archive),
+              icon: _generando ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.archive),
               label: const Text("GENERAR Y COMPRIMIR REPORTE"),
               onPressed: _generando ? null : _generarYComprimirReporte,
             ),
@@ -353,40 +467,5 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
         ),
       ),
     );
-  }
-}
-
-// Lógica de nomenclatura (puede moverse a un archivo separado si crece)
-String obtenerNomenclatura({
-  String? elemento,
-  String? closureNaturaleza,
-  String? fdtConClosureSecundario,
-  required Map<String, String> campos,
-}) {
-  switch (elemento) {
-    case "NAP":
-      return "M${campos["Numero de FDT"] ?? ""}-CS${campos["Numero de cable secundario"] ?? ""}-M${campos["Numero de NAP"] ?? ""}";
-    case "Closure":
-      switch (closureNaturaleza) {
-        case "Distribucion":
-          return "${campos["Feeder"] ?? ""}-CL${campos["Nro Closure"] ?? ""}";
-        case "Secundario":
-          return "CL${campos["Closure padre"] ?? ""}-D${campos["Distribucion"] ?? ""}-CLS${campos["Closure secundario"] ?? ""}";
-        case "Continuidad":
-          return "CLC${campos["Nro Closure"] ?? ""}";
-        case "Reparacion":
-          return "CLR${campos["Nro Closure de reparacion"] ?? ""}";
-        default:
-          return "";
-      }
-    case "FDT":
-      if (fdtConClosureSecundario == "No") {
-        return "CL${campos["Closure padre"] ?? ""}-D${campos["Distribucion"] ?? ""}-M${campos["Nro FDT"] ?? ""}";
-      } else if (fdtConClosureSecundario == "Si") {
-        return "CLS${campos["Closure Secundario padre"] ?? ""}-D${campos["Distribucion"] ?? ""}-M${campos["Numero de FDT"] ?? ""}";
-      }
-      return "";
-    default:
-      return "";
   }
 }
