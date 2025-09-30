@@ -135,7 +135,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
     '-': ['-'],
   };
   final List<String> _opcionesElementoFijacion = ['Tirraje', '1 Fleje', '2 Fleje', 'Otro'];
-  final List<String> _opcionesReservasDistribucion = ['Bajo norma', 'Fuera de norma'];
+  //final List<String> _opcionesReservasDistribucion = ['Bajo norma', 'Fuera de norma'];
   final List<String> _opcionesObsDiseno = ['Sí', 'No'];
 
   // Limpia todos los campos y la tabla
