@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 
 class GeoField extends StatefulWidget {
   final TextEditingController controller;
@@ -89,44 +90,59 @@ class _GeoFieldState extends State<GeoField> {
       current = null;
     }
 
-    LatLng initial = current != null
+    final LatLng initial = current != null
         ? LatLng(current.latitude, current.longitude)
         : const LatLng(10.500000, -66.900000); // Fallback
 
-    LatLng? picked = await showDialog<LatLng>(
+    final LatLng? picked = await showDialog<LatLng>(
       context: context,
       builder: (context) {
         LatLng selected = initial;
-        return AlertDialog(
-          title: const Text('Seleccione ubicación'),
-          content: SizedBox(
-            width: 300,
-            height: 350,
-            child: GoogleMap(
-              initialCameraPosition: CameraPosition(target: initial, zoom: 16),
-              markers: {
-                Marker(
-                  markerId: const MarkerId('pick'),
-                  position: selected,
-                  draggable: true,
-                  onDragEnd: (p) {
-                    selected = p;
-                  },
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return AlertDialog(
+              title: const Text('Seleccione ubicación'),
+              content: SizedBox(
+                width: 320,
+                height: 380,
+                child: FlutterMap(
+                  options: MapOptions(
+                    initialCenter: initial,
+                    initialZoom: 16,
+                    onTap: (tapPosition, point) {
+                      setStateDialog(() {
+                        selected = point;
+                      });
+                    },
+                  ),
+                  children: [
+                    TileLayer(
+                      urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      subdomains: const ['a', 'b', 'c'],
+                      userAgentPackageName: 'com.example.planta_externa',
+                    ),
+                    MarkerLayer(
+                      markers: [
+                        Marker(
+                          point: selected,
+                          width: 40,
+                          height: 40,
+                          child: const Icon(Icons.location_on, color: Colors.red, size: 40),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-              },
-              onTap: (point) {
-                selected = point;
-                (context as Element).markNeedsBuild();
-              },
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, selected),
-              child: const Text('Usar ubicación'),
-            ),
-          ],
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context, selected),
+                  child: const Text('Usar ubicación'),
+                ),
+              ],
+            );
+          },
         );
       },
     );

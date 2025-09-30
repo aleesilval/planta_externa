@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:pdf/pdf.dart';
 import 'package:printing/printing.dart';
+import 'package:planta_externa/geo_field.dart';
+import 'dart:io';
+import 'dart:convert';
+import 'package:path_provider/path_provider.dart';
 void main() {
   runApp(const FormularioPage());
 }
@@ -29,6 +33,42 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
   final List<Map<String, dynamic>> _tabla = [];
   int _contador = 1;
   int? _editNro; // para la edición
+
+  // Persistencia local
+  Future<File> get _localFile async {
+    final directory = await getApplicationDocumentsDirectory();
+    return File('${directory.path}/planilla1_data.json');
+  }
+
+  Future<void> _cargarDatos() async {
+    try {
+      final file = await _localFile;
+      if (await file.exists()) {
+        final contents = await file.readAsString();
+        final List<dynamic> jsonData = json.decode(contents);
+        _tabla.clear();
+        _tabla.addAll(jsonData.cast<Map<String, dynamic>>());
+        if (_tabla.isNotEmpty) {
+          _contador = _tabla.map((e) => e['contador'] as int).reduce((a, b) => a > b ? a : b) + 1;
+          _bloquearCabecera = true;
+        }
+        setState(() {});
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _guardarDatos() async {
+    try {
+      final file = await _localFile;
+      await file.writeAsString(json.encode(_tabla));
+    } catch (_) {}
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarDatos();
+  }
 
   // Nuevos campos encabezado
   final TextEditingController _unidadNegocioController = TextEditingController();
@@ -63,6 +103,18 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
   final TextEditingController _postesInstaladosController = TextEditingController();
   final TextEditingController _observacionesController = TextEditingController();
   final TextEditingController _trabajosPendientesController = TextEditingController();
+  // Nuevo campo YK01
+  final TextEditingController _yk01Controller = TextEditingController();
+
+  // Dropdown para Tendido (Actual/Acción) y Reservas
+  String _tendidoActual = 'Bajo norma';
+  String _tendidoAccion = 'Se ejecuto mantenimiento';
+  final List<String> _opcionesActual = ['Bajo norma', 'Fuera de norma'];
+  final List<String> _opcionesAccion = [
+    'Se ejecuto mantenimiento',
+    'Se agendo mantenimiento',
+    'No se procedio mantenimiento'
+  ];
 
   // Opciones para campos dependientes
   final List<String> _opcionesTipoCable = ['Cable alimentador', 'Cable de distribución'];
@@ -77,10 +129,10 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
   final List<String> _opcionesTipoElemento = ['NAP', 'CL', 'FDT', 'FDT Secundario', '-'];
   final Map<String, List<String>> _opcionesModeloElemento = {
     'NAP': ['IP65', 'IP67'],
-    'CL': ['288H Continuidad','288H Distribucion''288H Continuidad' '144H', 'mini96H'],
-    'FDT': ['CL288 ', 'IP67'],
+    'CL': ['288H Continuidad','288H Distribucion','288H Reparacion','144H Continuidad','144H Distribucion','144H Reparacion', 'mini96H'],
+    'FDT': ['CL288 ', 'IP67','Otro'],
     'FDT Secundario': ['CL288 ', 'IP67', 'Otro'],
-    '-': ['- '],
+    '-': ['-'],
   };
   final List<String> _opcionesElementoFijacion = ['Tirraje', '1 Fleje', '2 Fleje', 'Otro'];
   final List<String> _opcionesReservasDistribucion = ['Bajo norma', 'Fuera de norma'];
@@ -116,6 +168,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
       _bloquearCabecera = false;
       _editNro = null;
     });
+    _guardarDatos();
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Formulario y tabla limpiados')),
     );
@@ -151,6 +204,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
         _observacionesController.clear();
         _trabajosPendientesController.clear();
       });
+      _guardarDatos();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(_editNro == null ? 'Fila agregada a la tabla' : 'Fila modificada')),
       );
@@ -162,6 +216,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
     'unidadNegocio': _unidadNegocioController.text,
     'tipoCable': _tipoCable,
     'hilos': _hilos,
+    'yk01': _yk01Controller.text,
     'identificacionTramo': _identificacionTramoController.text,
     'observacionesDiseno': _observacionesDiseno,
     'soporteRetencion': _soporteRetencionController.text,
@@ -172,8 +227,8 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
     'elementoFijacion': _elementoFijacion,
     'cantidadElemento': _cantidadElementoController.text,
     'geolocalizacionElemento': _geolocalizacionElementoController.text,
-    'tendidoInicio': _tendidoInicioController.text,
-    'tendidoFin': _tendidoFinController.text,
+    'tendidoActual': _tendidoActual,
+    'tendidoAccion': _tendidoAccion,
     'reservasActual': _reservasActual,
     'reservasAccion': _reservasAccion,
     'zonasPodaInicio': _zonasPodaInicioController.text,
@@ -302,10 +357,10 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
   Widget build(BuildContext context) {
     final hilosOptions = _opcionesHilos[_tipoCable]!;
     if (!hilosOptions.contains(_hilos)) _hilos = hilosOptions[0];
-    // Filtra NAP si es cable alimentador
+    // Filtrado de Tipo de Elemento según Tipo de cable
     final tipoElementoOptions = _tipoCable == 'Cable alimentador'
-        ? _opcionesTipoElemento.where((e) => e != 'NAP').toList()
-        : _opcionesTipoElemento;
+        ? _opcionesTipoElemento.where((e) => e == 'CL' || e == '-').toList()
+        : _opcionesTipoElemento.where((e) => e == 'FDT' || e == 'FDT Secundario' || e == 'NAP').toList();
     if (!tipoElementoOptions.contains(_tipoElemento)) _tipoElemento = tipoElementoOptions[0];
     final modeloOptions = _opcionesModeloElemento[_tipoElemento]!;
     if (!modeloOptions.contains(_modeloElementoFijado)) _modeloElementoFijado = modeloOptions[0];
@@ -338,6 +393,11 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                     _buildDropdownField('Hilos', _hilos, hilosOptions, (val) {
                       setState(() { _hilos = val!; });
                     }, enabled: !_bloquearCabecera),
+                    _buildTextField('YK01', _yk01Controller),
+                    GeoField(
+                      controller: _geolocalizacionElementoController,
+                      label: 'Geolocalización del elemento fijado',
+                    ),
                     _buildDropdownField('Observaciones en diseño', _observacionesDiseno, _opcionesObsDiseno, (val) {
                       setState(() { _observacionesDiseno = val!; });
                     }),
@@ -356,22 +416,23 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                       setState(() { _elementoFijacion = val!; });
                     }),
                     _buildTextField('Cantidad', _cantidadElementoController),
-                    _buildTextField('Geolocalización del elemento fijado', _geolocalizacionElementoController),
-                    _buildTextField('Tendido con perdida de tensión Geolocalización inicio', _tendidoInicioController),
-                    _buildTextField('Tendido con perdida de tensión Geolocalización fin', _tendidoFinController),
-                    if (_tipoCable == 'Cable alimentador') ...[
-                      _buildTextFieldReservas('Reservas $_hilos Actual', (val) => setState(() => _reservasActual = val), _reservasActual),
-                      _buildTextFieldReservas('Reservas $_hilos Acción', (val) => setState(() => _reservasAccion = val), _reservasAccion),
-                    ] else ...[
-                      _buildDropdownField('Reservas 12H Actual', _reservasActual.isNotEmpty ? _reservasActual : _opcionesReservasDistribucion[0], _opcionesReservasDistribucion, (val) {
-                        setState(() { _reservasActual = val!; });
-                      }),
-                      _buildDropdownField('Reservas 12H Acción', _reservasAccion.isNotEmpty ? _reservasAccion : _opcionesReservasDistribucion[0], _opcionesReservasDistribucion, (val) {
-                        setState(() { _reservasAccion = val!; });
-                      }),
-                    ],
-                    _buildTextField('Geolocalización de zona poda inicio', _zonasPodaInicioController),
-                    _buildTextField('Geolocalización de zona poda fin', _zonasPodaFinController),
+                    _buildDropdownField('Tendido con perdida de tensión Geolocalización Actual', _tendidoActual, _opcionesActual, (val) { setState(() { _tendidoActual = val!; }); }),
+                    _buildDropdownField('Tendido con perdida de tensión Geolocalización Acción', _tendidoAccion, _opcionesAccion, (val) { setState(() { _tendidoAccion = val!; }); }),
+                    // Reservas (dropdowns)
+                    _buildDropdownField('Reservas Actual', _reservasActual.isNotEmpty ? _reservasActual : _opcionesActual[0], _opcionesActual, (val) {
+                      setState(() { _reservasActual = val!; });
+                    }),
+                    _buildDropdownField('Reservas Acción', _reservasAccion.isNotEmpty ? _reservasAccion : _opcionesAccion[0], _opcionesAccion, (val) {
+                      setState(() { _reservasAccion = val!; });
+                    }),
+                    GeoField(
+                      controller: _zonasPodaInicioController,
+                      label: 'Geolocalización de zona poda inicio',
+                    ),
+                    GeoField(
+                      controller: _zonasPodaFinController,
+                      label: 'Geolocalización de zona poda fin',
+                    ),
                     _buildTextField('Postes propiedad de Inter instalados', _postesInstaladosController),
                     _buildTextField('Observaciones', _observacionesController),
                     _buildTextField('Trabajos pendientes', _trabajosPendientesController),
@@ -456,6 +517,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                             DataColumn(label: Text('Unidad Negocio')),
                             DataColumn(label: Text('Tipo cable')),
                             DataColumn(label: Text('Hilos')),
+                            DataColumn(label: Text('YK01')),
                             DataColumn(label: Text('Identificación tramo')),
                             DataColumn(label: Text('Obs. Diseño')),
                             DataColumn(label: Text('Soporte de Retención')),
@@ -466,8 +528,8 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                             DataColumn(label: Text('Elemento de fijación')),
                             DataColumn(label: Text('Cantidad')),
                             DataColumn(label: Text('Geolocalización')),
-                            DataColumn(label: Text('Tendido inicio')),
-                            DataColumn(label: Text('Tendido fin')),
+                            DataColumn(label: Text('Tendido Actual')),
+                            DataColumn(label: Text('Tendido Acción')),
                             DataColumn(label: Text('Reservas Actual')),
                             DataColumn(label: Text('Reservas Acción')),
                             DataColumn(label: Text('Zonas poda inicio')),
@@ -483,6 +545,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                                 DataCell(Text(fila['unidadNegocio'] ?? '')),
                                 DataCell(Text(fila['tipoCable'] ?? '')),
                                 DataCell(Text(fila['hilos'] ?? '')),
+                                DataCell(Text(fila['yk01'] ?? '')),
                                 DataCell(Text(fila['identificacionTramo'] ?? '')),
                                 DataCell(Text(fila['observacionesDiseno'] ?? '')),
                                 DataCell(Text(fila['soporteRetencion'] ?? '')),
@@ -493,8 +556,8 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                                 DataCell(Text(fila['elementoFijacion'] ?? '')),
                                 DataCell(Text(fila['cantidadElemento'] ?? '')),
                                 DataCell(Text(fila['geolocalizacionElemento'] ?? '')),
-                                DataCell(Text(fila['tendidoInicio'] ?? '')),
-                                DataCell(Text(fila['tendidoFin'] ?? '')),
+                                DataCell(Text(fila['tendidoActual'] ?? '')),
+                                DataCell(Text(fila['tendidoAccion'] ?? '')),
                                 DataCell(Text(fila['reservasActual'] ?? '')),
                                 DataCell(Text(fila['reservasAccion'] ?? '')),
                                 DataCell(Text(fila['zonasPodaInicio'] ?? '')),
