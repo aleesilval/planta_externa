@@ -17,7 +17,7 @@ class _WelcomePageState extends State<WelcomePage> {
     Widget page;
     switch (_selectedPlanilla) {
       case 1: page = const FormularioPage(); break;
-      case 2: page = const Planilla2Page(); break;
+      case 2: page =  Planilla2Page(); break;
       case 3: page = const Planilla3Page(); break;
       default: page = const FormularioPage();
     }

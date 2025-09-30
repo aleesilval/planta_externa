@@ -1,5 +1,5 @@
 name: planta_externa
-description: "A new Flutter project."
+description: "App de planillas de Planta Externat."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -30,18 +30,22 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  image_picker: ^1.0.7 # Usa la última versión disponible
-  pdf: ^3.10.1
+  # ... otras dependencias ...
+  file_picker: ^10.3.3
+  image_picker: ^1.0.7
+  pdf: ^3.10.4
   printing: ^5.12.0
   excel: ^4.0.6
   path_provider: ^2.1.2
   flutter_map: ^8.2.2
   latlong2: ^0.9.0
-  geolocator: ^14.0.2
   google_maps_flutter: ^2.6.0
+  archive: ^3.4.6
+
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
+  geolocator: ^14.0.2
 
 dev_dependencies:
   flutter_test:
