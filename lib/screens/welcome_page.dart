@@ -41,7 +41,7 @@ class _WelcomePageState extends State<WelcomePage> {
               value: _selectedPlanilla,
               items: const [
                 DropdownMenuItem(value: 1, child: Text('Auditoria de Mantenimiento ')),
-                DropdownMenuItem(value: 2, child: Text('Planilla 2')),
+                DropdownMenuItem(value: 2, child: Text('Inspeccion de red')),
                 DropdownMenuItem(value: 3, child: Text('Planilla 3')),
               ],
               onChanged: (val) => setState(() => _selectedPlanilla = val ?? 1),
@@ -51,9 +51,19 @@ class _WelcomePageState extends State<WelcomePage> {
               onPressed: () => _navigateToPlanilla(context),
               child: const Text('Ir a la planilla'),
             ),
+            const SizedBox(height: 20),
+            Text(
+              'Creado por Alejandro Silva',
+              style: TextStyle(
+                color: Colors.grey,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            )
           ],
         ),
       ),
+      
     );
   }
 }

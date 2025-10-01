@@ -2,28 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:pdf/pdf.dart';
 import 'package:printing/printing.dart';
-import 'package:planta_externa/geo_field.dart'; // Asegúrate de tener un GeoField compatible
+import 'package:planta_externa/geo_field.dart';
 import 'dart:io';
 import 'dart:convert';
 import 'package:path_provider/path_provider.dart';
-
-void main() {
-  runApp(const FormularioPage());
-}
 
 class FormularioPage extends StatelessWidget {
   const FormularioPage({super.key});
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Auditoría de Mantenimiento',
-      theme: ThemeData(primarySwatch: Colors.blue),
-      home: const FormularioPlantaExterna(),
-      routes: {
-        '/welcome_page': (context) => const Placeholder(),
-        // Cambia Placeholder por tu widget de welcome_page real
-      },
-    );
+    return const FormularioPlantaExterna(); // ✅ Solo el widget, sin MaterialApp
   }
 }
 
@@ -119,8 +107,8 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
   final TextEditingController _trabajosPendientesController = TextEditingController();
 
   // Mediciones (4 Hilos) - 16 puertos, doble tabla para 1550nm y 1490nm
-  List<TextEditingController> _medicionesPuertos1550 = List.generate(16, (i) => TextEditingController());
-  List<TextEditingController> _medicionesPuertos1490 = List.generate(16, (i) => TextEditingController());
+  final List<TextEditingController> _medicionesPuertos1550 = List.generate(16, (i) => TextEditingController());
+  final List<TextEditingController> _medicionesPuertos1490 = List.generate(16, (i) => TextEditingController());
 
   // Opciones
   final List<String> _opcionesTipoCable = [
@@ -488,8 +476,10 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pushReplacementNamed('/welcome_page'),
+          onPressed: () => Navigator.of(context).pop(),
         ),
+
+
         title: const Text('Auditoría de Mantenimiento'),
         actions: [
           IconButton(
@@ -765,7 +755,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                                             child: Text(
                                               "P${i+1}: "
                                                 "${fila['medicionesPuertos1550'] != null && fila['medicionesPuertos1550'].length > i ? fila['medicionesPuertos1550'][i] : ''} dBm",
-                                              style: const TextStyle(fontSize: 10, fontFamily: 'monospace'),
+                                              style: const TextStyle(fontSize: 5, fontFamily: 'monospace'),
                                             ),
                                           ),
                                         ]),
@@ -783,7 +773,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                                             child: Text(
                                               "P${i+1}: "
                                                 "${fila['medicionesPuertos1490'] != null && fila['medicionesPuertos1490'].length > i ? fila['medicionesPuertos1490'][i] : ''} dBm",
-                                              style: const TextStyle(fontSize: 10, fontFamily: 'monospace'),
+                                              style: const TextStyle(fontSize: 5, fontFamily: 'monospace'),
                                             ),
                                           ),
                                         ]),
@@ -803,7 +793,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                     padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
                     child: Text(
                       "Total de postes inspeccionados: $totalPostesInspeccionados",
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 10),
                     ),
                   )
                 ],
@@ -834,7 +824,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: DropdownButtonFormField<String>(
-        value: value,
+        initialValue: value,
         decoration: InputDecoration(
           labelText: label,
           border: const OutlineInputBorder(),

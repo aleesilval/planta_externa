@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:pdf/widgets.dart' as pw;
 import 'report_logic.dart';
 
 class ReportGeneratorScreen extends StatefulWidget {
@@ -360,33 +361,41 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
       }
     }
 
-    final success = await generateAndCompressReport(
-      instalador: _instaladorController.text,
-      fecha: _fechaActual,
-      ubicacion: _ubicacionActual,
-      unidadNegocio: _unidadNegocioController.text,
-      elemento: _elementoSeleccionado,
-      closureNaturaleza: _closureNaturaleza,
-      fdtConClosureSecundario: _fdtConClosureSecundario,
-      campos: campos,
+    // Generar PDF en memoria
+    final pdf = pw.Document();
+    pdf.addPage(
+      pw.Page(
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text('Reporte de Instalación', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 16),
+              pw.Text('Instalador: ${_instaladorController.text}'),
+              pw.Text('Fecha: ${_fechaActual.toLocal()}'),
+              pw.Text('Ubicación: ${_ubicacionActual != null ? "${_ubicacionActual!.latitude}, ${_ubicacionActual!.longitude}" : "No disponible"}'),
+              pw.Text('Unidad de Negocios: ${_unidadNegocioController.text}'),
+              pw.Text('Elemento: $_elementoSeleccionado'),
+              if (_closureNaturaleza != null) pw.Text('Naturaleza: $_closureNaturaleza'),
+              if (_fdtConClosureSecundario != null) pw.Text('¿Con closure secundario?: $_fdtConClosureSecundario'),
+              pw.SizedBox(height: 8),
+              ...campos.entries.map((e) => pw.Text('${e.key}: ${e.value}')),
+              pw.SizedBox(height: 8),
+              pw.Text('Nomenclatura generada: $_nomenclatura', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+            ],
+          );
+        },
+      ),
+    );
+
+    await saveAndCompressToDownloads(
       nomenclatura: _nomenclatura,
+      pdf: pdf,
       fotosPorSeccion: _fotosPorSeccion,
       context: context,
     );
-    setState(() => _generando = false);
 
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text(success ? "Éxito" : "Error"),
-        content: Text(success
-            ? "Reporte generado y comprimido con éxito en la carpeta Descargas."
-            : "Hubo un error al generar el reporte."),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK")),
-        ],
-      ),
-    );
+    setState(() => _generando = false);
   }
 
   @override
@@ -459,8 +468,8 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
 
             const SizedBox(height: 16),
             ElevatedButton.icon(
-              icon: _generando ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.archive),
-              label: const Text("GENERAR Y COMPRIMIR REPORTE"),
+              icon: _generando ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.download),
+              label: const Text("GUARDAR EN DESCARGAS (ZIP)"),
               onPressed: _generando ? null : _generarYComprimirReporte,
             ),
           ],

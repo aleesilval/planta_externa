@@ -117,8 +117,8 @@ class _GeoFieldState extends State<GeoField> {
                   ),
                   children: [
                     TileLayer(
-                      urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                      subdomains: const ['a', 'b', 'c'],
+                      urlTemplate: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
+                      subdomains: const ['a', 'b', 'c', 'd'],
                       userAgentPackageName: 'com.example.planta_externa',
                     ),
                     MarkerLayer(
