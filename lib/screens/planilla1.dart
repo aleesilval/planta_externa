@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:pdf/pdf.dart';
 import 'package:printing/printing.dart';
+import 'package:planta_externa/geo_field.dart'; // Asegúrate de tener un GeoField compatible
+import 'dart:io';
+import 'dart:convert';
+import 'package:path_provider/path_provider.dart';
 
 void main() {
   runApp(const FormularioPage());
@@ -16,7 +20,8 @@ class FormularioPage extends StatelessWidget {
       theme: ThemeData(primarySwatch: Colors.blue),
       home: const FormularioPlantaExterna(),
       routes: {
-        '/welcome_page': (context) => const Placeholder(), // Cambia esto por tu WelcomePage real
+        '/welcome_page': (context) => const Placeholder(),
+        // Cambia Placeholder por tu widget de welcome_page real
       },
     );
   }
@@ -32,13 +37,49 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
   final _formKey = GlobalKey<FormState>();
   final List<Map<String, dynamic>> _tabla = [];
   int _contador = 1;
-  int? _editNro; // para edición
+  int? _editNro;
+
+  // Persistencia local
+  Future<File> get _localFile async {
+    final directory = await getApplicationDocumentsDirectory();
+    return File('${directory.path}/planilla1_data.json');
+  }
+
+  Future<void> _cargarDatos() async {
+    try {
+      final file = await _localFile;
+      if (await file.exists()) {
+        final contents = await file.readAsString();
+        final List<dynamic> jsonData = json.decode(contents);
+        _tabla.clear();
+        _tabla.addAll(jsonData.cast<Map<String, dynamic>>());
+        if (_tabla.isNotEmpty) {
+          _contador = _tabla.map((e) => e['contador'] as int).reduce((a, b) => a > b ? a : b) + 1;
+          _bloquearCabecera = true;
+        }
+        setState(() {});
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _guardarDatos() async {
+    try {
+      final file = await _localFile;
+      await file.writeAsString(json.encode(_tabla));
+    } catch (_) {}
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarDatos();
+  }
 
   // Encabezado y controladores
   final TextEditingController _unidadNegocioController = TextEditingController();
   String _tipoCable = 'Cable alimentador';
   String _hilos = 'Azul';
-  final TextEditingController _identificacionTramoController = TextEditingController();
+  final TextEditingController _fdtPadreController = TextEditingController();
 
   bool _bloquearCabecera = false;
   String _observacionesDiseno = 'Sí';
@@ -47,10 +88,13 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
   String _posteInter = 'Sí';
   final TextEditingController _accionPosteInterController = TextEditingController();
 
-  // Materiales utilizados
-  String _materialesUtilizados = 'Adición de fleje faltante';
+  // Poste ya inspeccionado
+  String _posteInspeccionado = 'No';
 
-  // Campos modif./unificados/condicionales
+  // Materiales utilizados
+  String _materialesUtilizados = ' - ';
+
+  // Campos condicionales
   final TextEditingController _soporteRetencionController = TextEditingController();
   final TextEditingController _soporteSuspensionController = TextEditingController();
   String _morseteriaIdentificada = 'Bajo Norma';
@@ -59,26 +103,30 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
   String _elementoFijacion = 'Tirraje';
   final TextEditingController _cantidadElementoController = TextEditingController();
   final TextEditingController _geolocalizacionElementoController = TextEditingController();
-  final TextEditingController _tendidoInicioController = TextEditingController();
-  final TextEditingController _tendidoFinController = TextEditingController();
+  final TextEditingController _yk01Controller = TextEditingController();
 
-  String _reservasActual = '';
-  String _reservasAccion = '';
+  // Geolocalización + dropdowns para tendido actual/acción
+  String _tendidoActual = 'Bajo norma';
+  String _tendidoAccion = 'Se corrige';
+
+  // Reservas
+  String _reservasActual = 'Bajo norma';
+  String _reservasAccion = 'Se corrige';
 
   final TextEditingController _zonasPodaInicioController = TextEditingController();
   final TextEditingController _zonasPodaFinController = TextEditingController();
   final TextEditingController _observacionesController = TextEditingController();
   final TextEditingController _trabajosPendientesController = TextEditingController();
 
+  // Mediciones (4 Hilos) - 16 puertos, doble tabla para 1550nm y 1490nm
+  List<TextEditingController> _medicionesPuertos1550 = List.generate(16, (i) => TextEditingController());
+  List<TextEditingController> _medicionesPuertos1490 = List.generate(16, (i) => TextEditingController());
+
   // Opciones
   final List<String> _opcionesTipoCable = [
     'Cable alimentador',
     'Cable de distribución',
     '4 Hilos'
-  ];
-  final List<String> _opcionesHilosDistribucion = [
-    'Azul', 'Naranja', 'Verde', 'Marron', 'Gris', 'Blanco', 'Rojo',
-    'Negro', 'Amarillo', 'Violeta', 'Rosa', 'Aqua'
   ];
   final Map<String, List<String>> _opcionesHilos = {
     'Cable alimentador': ['144 Hilos', '96 Hilos', '48 Hilos'],
@@ -94,6 +142,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
   final List<String> _opcionesMorseteria = ['Bajo Norma', 'Fuera de Norma'];
   final List<String> _opcionesElementoFijacion = ['Tirraje', '1 Fleje', '2 Fleje', 'Otro'];
   final List<String> _opcionesMateriales = [
+    ' - ',
     'Adición de fleje faltante',
     'Adición de precinto en reserva',
     'Colocación de etiqueta',
@@ -102,13 +151,18 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
     'Colocación de YK01',
   ];
   final List<String> _opcionesPosteInter = ['Sí', 'No'];
-  final List<String> _opcionesReservasDistribucion = ['Bajo norma', 'Fuera de norma'];
+  final List<String> _opcionesPosteInspeccionado = ['Sí', 'No'];
   final List<String> _opcionesObsDiseno = ['Sí', 'No'];
+  final List<String> _opcionesTendidoActual = ['Bajo norma', 'Fuera de norma'];
+  final List<String> _opcionesTendidoAccion = ['Se corrige', 'Se agenda correccion', 'No procede'];
+  final List<String> _opcionesReservasActual = ['Bajo norma', 'Fuera de norma'];
+  final List<String> _opcionesReservasAccion = ['Se corrige', 'Se agenda correccion', 'No procede'];
 
   final Map<String, List<String>> _opcionesModeloElemento = {
     'NAP': ['IP65', 'IP67'],
-    'CL': ['288H', '144H', 'mini96H'],
+    'CL': ['288H distribucion','144H distribucion','144H continuidad','288H continuidad','144H reparacion','288H reparacion', 'mini96H'],
     'FDT': ['CL288', 'IP67'],
+    'FDT Secundario': ['CL288', 'IP67'],
     '-': ['-'],
   };
 
@@ -118,22 +172,29 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
   String get labelSoporteSuspension => _tipoCable == '4 Hilos' ? 'Nomenclatura del NAP' : 'Soporte de Suspensión';
   List<String> get opcionesTipoElemento {
     if (_tipoCable == '4 Hilos') return ['NAP', '-'];
-    if (_tipoCable == 'Cable de distribución') return ['CL', 'FDT'];
-    if (_tipoCable == 'Cable alimentador') return ['CL', 'FDT']; // NAP no permitido
+    if (_tipoCable == 'Cable de distribución') return ['FDT','FDT Secundario','-'];
+    if (_tipoCable == 'Cable alimentador') return ['CL', '-'];
     return ['CL', 'FDT'];
   }
   bool get bloquearNomenclaturaNAP => _tipoCable == '4 Hilos' && _tipoElemento == '-';
 
-  // Limpia todos los campos y la tabla
+  int get totalPostesInspeccionados {
+    if (_tabla.isEmpty) return 0;
+    int total = _tabla.length;
+    int inspeccionados = _tabla.where((fila) => fila['posteInspeccionado'] == 'Sí').length;
+    return total - inspeccionados;
+  }
+
   void _limpiarTodo() {
     setState(() {
       _unidadNegocioController.clear();
       _tipoCable = 'Cable alimentador';
       _hilos = _opcionesHilos[_tipoCable]![0];
-      _identificacionTramoController.clear();
+      _fdtPadreController.clear();
       _observacionesDiseno = 'Sí';
       _posteInter = 'Sí';
       _accionPosteInterController.clear();
+      _posteInspeccionado = 'No';
       _materialesUtilizados = _opcionesMateriales[0];
       _soporteRetencionController.clear();
       _soporteSuspensionController.clear();
@@ -143,10 +204,10 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
       _elementoFijacion = 'Tirraje';
       _cantidadElementoController.clear();
       _geolocalizacionElementoController.clear();
-      _tendidoInicioController.clear();
-      _tendidoFinController.clear();
-      _reservasActual = '';
-      _reservasAccion = '';
+      _tendidoActual = _opcionesTendidoActual[0];
+      _tendidoAccion = _opcionesTendidoAccion[0];
+      _reservasActual = _opcionesReservasActual[0];
+      _reservasAccion = _opcionesReservasAccion[0];
       _zonasPodaInicioController.clear();
       _zonasPodaFinController.clear();
       _observacionesController.clear();
@@ -155,7 +216,11 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
       _contador = 1;
       _bloquearCabecera = false;
       _editNro = null;
+      _yk01Controller.clear();
+      for (final c in _medicionesPuertos1550) { c.clear(); }
+      for (final c in _medicionesPuertos1490) { c.clear(); }
     });
+    _guardarDatos();
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Formulario y tabla limpiados')),
     );
@@ -179,10 +244,10 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
         _soporteSuspensionController.clear();
         _cantidadElementoController.clear();
         _geolocalizacionElementoController.clear();
-        _tendidoInicioController.clear();
-        _tendidoFinController.clear();
-        _reservasActual = '';
-        _reservasAccion = '';
+        _tendidoActual = _opcionesTendidoActual[0];
+        _tendidoAccion = _opcionesTendidoAccion[0];
+        _reservasActual = _opcionesReservasActual[0];
+        _reservasAccion = _opcionesReservasAccion[0];
         _zonasPodaInicioController.clear();
         _zonasPodaFinController.clear();
         _observacionesController.clear();
@@ -190,7 +255,12 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
         _accionPosteInterController.clear();
         _materialesUtilizados = _opcionesMateriales[0];
         _posteInter = 'Sí';
+        _posteInspeccionado = 'No';
+        _yk01Controller.clear();
+        for (final c in _medicionesPuertos1550) { c.clear(); }
+        for (final c in _medicionesPuertos1490) { c.clear(); }
       });
+      _guardarDatos();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(_editNro == null ? 'Fila agregada a la tabla' : 'Fila modificada')),
       );
@@ -202,10 +272,12 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
     'unidadNegocio': _unidadNegocioController.text,
     'tipoCable': _tipoCable,
     'hilos': _hilos,
-    'identificacionTramo': _identificacionTramoController.text,
+    'fdtPadre': _fdtPadreController.text,
+    'yk01': _yk01Controller.text,
     'observacionesDiseno': _observacionesDiseno,
     'posteInter': _posteInter,
     'accionPosteInter': _posteInter == 'Sí' ? _accionPosteInterController.text : ' - ',
+    'posteInspeccionado': _posteInspeccionado,
     'materialesUtilizados': _materialesUtilizados,
     'soporteRetencion': _soporteRetencionController.text,
     'soporteSuspension': _tipoCable == '4 Hilos' && _tipoElemento == '-' ? ' - ' : _soporteSuspensionController.text,
@@ -215,14 +287,16 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
     'elementoFijacion': _elementoFijacion,
     'cantidadElemento': _cantidadElementoController.text,
     'geolocalizacionElemento': _geolocalizacionElementoController.text,
-    'tendidoInicio': _tendidoInicioController.text,
-    'tendidoFin': _tendidoFinController.text,
+    'tendidoActual': _tendidoActual,
+    'tendidoAccion': _tendidoAccion,
     'reservasActual': _reservasActual,
     'reservasAccion': _reservasAccion,
     'zonasPodaInicio': _zonasPodaInicioController.text,
     'zonasPodaFin': _zonasPodaFinController.text,
     'observaciones': _observacionesController.text,
     'trabajosPendientes': _trabajosPendientesController.text,
+    'medicionesPuertos1550': _tipoCable == '4 Hilos' ? _medicionesPuertos1550.map((c) => c.text).toList() : null,
+    'medicionesPuertos1490': _tipoCable == '4 Hilos' ? _medicionesPuertos1490.map((c) => c.text).toList() : null,
   };
 
   void _cargarFila(int nro) {
@@ -233,10 +307,11 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
         _unidadNegocioController.text = fila['unidadNegocio'];
         _tipoCable = fila['tipoCable'];
         _hilos = fila['hilos'];
-        _identificacionTramoController.text = fila['identificacionTramo'];
+        _fdtPadreController.text = fila['fdtPadre'] ?? '';
         _observacionesDiseno = fila['observacionesDiseno'] ?? 'Sí';
         _posteInter = fila['posteInter'] ?? 'Sí';
         _accionPosteInterController.text = fila['accionPosteInter'] ?? '';
+        _posteInspeccionado = fila['posteInspeccionado'] ?? 'No';
         _materialesUtilizados = fila['materialesUtilizados'] ?? _opcionesMateriales[0];
         _soporteRetencionController.text = fila['soporteRetencion'] ?? '';
         _soporteSuspensionController.text = fila['soporteSuspension'] == ' - ' ? '' : fila['soporteSuspension'] ?? '';
@@ -246,14 +321,23 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
         _elementoFijacion = fila['elementoFijacion'];
         _cantidadElementoController.text = fila['cantidadElemento'];
         _geolocalizacionElementoController.text = fila['geolocalizacionElemento'];
-        _tendidoInicioController.text = fila['tendidoInicio'];
-        _tendidoFinController.text = fila['tendidoFin'];
-        _reservasActual = fila['reservasActual'];
-        _reservasAccion = fila['reservasAccion'];
+        _tendidoActual = fila['tendidoActual'] ?? _opcionesTendidoActual[0];
+        _tendidoAccion = fila['tendidoAccion'] ?? _opcionesTendidoAccion[0];
+        _reservasActual = fila['reservasActual'] ?? _opcionesReservasActual[0];
+        _reservasAccion = fila['reservasAccion'] ?? _opcionesReservasAccion[0];
         _zonasPodaInicioController.text = fila['zonasPodaInicio'];
         _zonasPodaFinController.text = fila['zonasPodaFin'];
         _observacionesController.text = fila['observaciones'];
         _trabajosPendientesController.text = fila['trabajosPendientes'];
+        _yk01Controller.text = fila['yk01'] ?? '';
+        if (_tipoCable == '4 Hilos') {
+          final l1550 = List<String>.from(fila['medicionesPuertos1550'] ?? []);
+          final l1490 = List<String>.from(fila['medicionesPuertos1490'] ?? []);
+          for (int i = 0; i < 16; i++) {
+            _medicionesPuertos1550[i].text = i < l1550.length ? l1550[i] : '';
+            _medicionesPuertos1490[i].text = i < l1490.length ? l1490[i] : '';
+          }
+        }
       });
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -262,8 +346,19 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
     }
   }
 
+  Future<void> _saveDraft() async {
+    await _guardarDatos();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Progreso guardado localmente')),
+    );
+  }
+
   Future<void> _exportarPDF() async {
     final pdf = pw.Document();
+    int inspeccionados = _tabla.where((fila) => fila['posteInspeccionado'] == 'Sí').length;
+    int totalPostes = _tabla.length;
+    int totalPostesInspeccionados = totalPostes - inspeccionados;
+
     pdf.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.letter.landscape,
@@ -275,7 +370,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
               pw.Text('Auditoría de Mantenimiento', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
               pw.SizedBox(height: 8),
               pw.Text(
-                '${_tipoCable == "4 Hilos" ? "FDT padre" : "Identificación de tramo"}: ${_identificacionTramoController.text}',
+                '${_unidadNegocioController.text}${_tipoCable == "4 Hilos" ? '   FDT padre: ${_fdtPadreController.text}' : ''}   Tipo de cable: $_tipoCable',
                 style: pw.TextStyle(fontSize: 12),
               ),
               pw.Divider(),
@@ -286,62 +381,88 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                   pw.TableRow(
                     decoration: const pw.BoxDecoration(color: PdfColors.grey300),
                     children: [
-                      pw.Text('Nro', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
-                      pw.Text('Unidad Negocio', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
-                      pw.Text('Tipo cable', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
-                      pw.Text('Hilos', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
-                      pw.Text('Obs. Diseño', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
-                      pw.Text('Poste Inter', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
-                      pw.Text('Acción Poste Inter', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
-                      pw.Text('Materiales', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
-                      pw.Text(labelSoporteRetencion, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
-                      pw.Text(labelSoporteSuspension, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
-                      pw.Text('Morsetería', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
-                      pw.Text('Tipo de Elemento', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
-                      pw.Text('Modelo', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
-                      pw.Text('Elemento de fijación', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
-                      pw.Text('Cantidad', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
-                      pw.Text('Geolocalización', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
-                      pw.Text('Tendido inicio', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
-                      pw.Text('Tendido fin', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
-                      pw.Text('Reservas Actual', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
-                      pw.Text('Reservas Acción', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
-                      pw.Text('Zonas poda inicio', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
-                      pw.Text('Zonas poda fin', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
-                      pw.Text('Observaciones', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
-                      pw.Text('Trabajos pendientes', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
+                      pw.Text('Nro', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6)),
+                      pw.Text('Obs. Diseño', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6)),
+                      pw.Text('Poste Inter', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6)),
+                      pw.Text('Acción Poste Inter', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6)),
+                      pw.Text('Poste inspeccionado', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6)),
+                      pw.Text('Soporte de Retención', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6)),
+                      pw.Text('Soporte de Suspensión', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6)),
+                      pw.Text('Morsetería', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6)),
+                      pw.Text('Tipo de Elemento', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6)),
+                      pw.Text('Modelo', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6)),
+                      pw.Text('Elemento de fijación', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6)),
+                      pw.Text('Cantidad', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6)),
+                      pw.Text('Geolocalización', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6)),
+                      pw.Text('Tendido Actual', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6)),
+                      pw.Text('Tendido Acción', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6)),
+                      pw.Text('Reservas Actual', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6)),
+                      pw.Text('Reservas Acción', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6)),
+                      if (_tipoCable == '4 Hilos') pw.Text('Mediciones 1550nm', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6)),
+                      if (_tipoCable == '4 Hilos') pw.Text('Mediciones 1490nm', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6)),
+                      pw.Text('Observaciones', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6)),
+                      pw.Text('Trabajos pendientes', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6)),
                     ],
                   ),
                   ..._tabla.map((fila) => pw.TableRow(
                     children: [
-                      pw.Text('${fila['contador']}', style: const pw.TextStyle(fontSize: 8)),
-                      pw.Text(fila['unidadNegocio'] ?? '', style: const pw.TextStyle(fontSize: 8)),
-                      pw.Text(fila['tipoCable'] ?? '', style: const pw.TextStyle(fontSize: 8)),
-                      pw.Text(fila['hilos'] ?? '', style: const pw.TextStyle(fontSize: 8)),
-                      pw.Text(fila['observacionesDiseno'] ?? '', style: const pw.TextStyle(fontSize: 8)),
-                      pw.Text(fila['posteInter'] ?? '', style: const pw.TextStyle(fontSize: 8)),
-                      pw.Text(fila['accionPosteInter'] ?? '', style: const pw.TextStyle(fontSize: 8)),
-                      pw.Text(fila['materialesUtilizados'] ?? '', style: const pw.TextStyle(fontSize: 8)),
-                      pw.Text(fila['soporteRetencion'] ?? '', style: const pw.TextStyle(fontSize: 8)),
-                      pw.Text(fila['soporteSuspension'] ?? '', style: const pw.TextStyle(fontSize: 8)),
-                      pw.Text(fila['morseteriaIdentificada'] ?? '', style: const pw.TextStyle(fontSize: 8)),
-                      pw.Text(fila['tipoElemento'] ?? '', style: const pw.TextStyle(fontSize: 8)),
-                      pw.Text(fila['modeloElementoFijado'] ?? '', style: const pw.TextStyle(fontSize: 8)),
-                      pw.Text(fila['elementoFijacion'] ?? '', style: const pw.TextStyle(fontSize: 8)),
-                      pw.Text(fila['cantidadElemento'] ?? '', style: const pw.TextStyle(fontSize: 8)),
-                      pw.Text(fila['geolocalizacionElemento'] ?? '', style: const pw.TextStyle(fontSize: 8)),
-                      pw.Text(fila['tendidoInicio'] ?? '', style: const pw.TextStyle(fontSize: 8)),
-                      pw.Text(fila['tendidoFin'] ?? '', style: const pw.TextStyle(fontSize: 8)),
-                      pw.Text(fila['reservasActual'] ?? '', style: const pw.TextStyle(fontSize: 8)),
-                      pw.Text(fila['reservasAccion'] ?? '', style: const pw.TextStyle(fontSize: 8)),
-                      pw.Text(fila['zonasPodaInicio'] ?? '', style: const pw.TextStyle(fontSize: 8)),
-                      pw.Text(fila['zonasPodaFin'] ?? '', style: const pw.TextStyle(fontSize: 8)),
-                      pw.Text(fila['observaciones'] ?? '', style: const pw.TextStyle(fontSize: 8)),
-                      pw.Text(fila['trabajosPendientes'] ?? '', style: const pw.TextStyle(fontSize: 8)),
+                      pw.Text('${fila['contador']}', style: const pw.TextStyle(fontSize: 6)),
+                      pw.Text(fila['observacionesDiseno'] ?? '', style: const pw.TextStyle(fontSize: 6)),
+                      pw.Text(fila['posteInter'] ?? '', style: const pw.TextStyle(fontSize: 6)),
+                      pw.Text(fila['accionPosteInter'] ?? '', style: const pw.TextStyle(fontSize: 6)),
+                      pw.Text(fila['posteInspeccionado'] ?? '', style: const pw.TextStyle(fontSize: 6)),
+                      pw.Text(fila['soporteRetencion'] ?? '', style: const pw.TextStyle(fontSize: 6)),
+                      pw.Text(fila['soporteSuspension'] ?? '', style: const pw.TextStyle(fontSize: 6)),
+                      pw.Text(fila['morseteriaIdentificada'] ?? '', style: const pw.TextStyle(fontSize: 6)),
+                      pw.Text(fila['tipoElemento'] ?? '', style: const pw.TextStyle(fontSize: 6)),
+                      pw.Text(fila['modeloElementoFijado'] ?? '', style: const pw.TextStyle(fontSize: 6)),
+                      pw.Text(fila['elementoFijacion'] ?? '', style: const pw.TextStyle(fontSize: 6)),
+                      pw.Text(fila['cantidadElemento'] ?? '', style: const pw.TextStyle(fontSize: 6)),
+                      pw.Text(fila['geolocalizacionElemento'] ?? '', style: const pw.TextStyle(fontSize: 6)),
+                      pw.Text(fila['tendidoActual'] ?? '', style: const pw.TextStyle(fontSize: 6)),
+                      pw.Text(fila['tendidoAccion'] ?? '', style: const pw.TextStyle(fontSize: 6)),
+                      pw.Text(fila['reservasActual'] ?? '', style: const pw.TextStyle(fontSize: 6)),
+                      pw.Text(fila['reservasAccion'] ?? '', style: const pw.TextStyle(fontSize: 6)),
+                      if (_tipoCable == '4 Hilos')
+                        pw.Container(
+                          width: 150,
+                          child: pw.Table(
+                            border: pw.TableBorder.all(width: 0.5, color: PdfColors.grey600),
+                            children: [
+                              for (int i = 0; i < 16; i++)
+                                pw.TableRow(children: [
+                                  pw.Padding(
+                                    padding: const pw.EdgeInsets.all(2),
+                                    child: pw.Text('P${i + 1}: ${fila['medicionesPuertos1550']?[i] ?? ""} dBm', style: const pw.TextStyle(fontSize: 6)),
+                                  ),
+                                ]),
+                            ],
+                          ),
+                        ),
+                      if (_tipoCable == '4 Hilos')
+                        pw.Container(
+                          width: 150,
+                          child: pw.Table(
+                            border: pw.TableBorder.all(width: 0.5, color: PdfColors.grey600),
+                            children: [
+                              for (int i = 0; i < 16; i++)
+                                pw.TableRow(children: [
+                                  pw.Padding(
+                                    padding: const pw.EdgeInsets.all(2),
+                                    child: pw.Text('P${i + 1}: ${fila['medicionesPuertos1490']?[i] ?? ""} dBm', style: const pw.TextStyle(fontSize: 6)),
+                                  ),
+                                ]),
+                            ],
+                          ),
+                        ),
+                      pw.Text(fila['observaciones'] ?? '', style: const pw.TextStyle(fontSize: 6)),
+                      pw.Text(fila['trabajosPendientes'] ?? '', style: const pw.TextStyle(fontSize: 6)),
                     ],
                   )),
                 ],
               ),
+              pw.SizedBox(height: 10),
+              pw.Text('Total de postes inspeccionados: $totalPostesInspeccionados', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
             ],
           );
         },
@@ -367,11 +488,16 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            Navigator.of(context).pushReplacementNamed('/welcome_page');
-          },
+          onPressed: () => Navigator.of(context).pushReplacementNamed('/welcome_page'),
         ),
         title: const Text('Auditoría de Mantenimiento'),
+        actions: [
+          IconButton(
+            tooltip: "Guardar",
+            icon: const Icon(Icons.save),
+            onPressed: _saveDraft,
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -384,15 +510,24 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                 child: ListView(
                   children: [
                     _buildTextField('Unidad de Negocio', _unidadNegocioController, enabled: !_bloquearCabecera),
+                    if (_tipoCable == '4 Hilos')
+                      _buildTextField('FDT padre', _fdtPadreController, enabled: !_bloquearCabecera),
                     _buildDropdownField('Tipo de cable', _tipoCable, _opcionesTipoCable, (val) {
                       setState(() { _tipoCable = val!; _hilos = _opcionesHilos[val]![0]; });
                     }, enabled: !_bloquearCabecera),
-                    _buildTextField(labelTramo, _identificacionTramoController, enabled: !_bloquearCabecera),
                     _buildDropdownField('Hilos', _hilos, hilosOptions, (val) {
                       setState(() { _hilos = val!; });
                     }, enabled: !_bloquearCabecera),
+                    _buildTextField('YK01', _yk01Controller),
+                    GeoField(
+                      controller: _geolocalizacionElementoController,
+                      label: 'Geolocalización del elemento fijado',
+                    ),
                     _buildDropdownField('Observaciones en diseño', _observacionesDiseno, _opcionesObsDiseno, (val) {
                       setState(() { _observacionesDiseno = val!; });
+                    }),
+                    _buildDropdownField('Poste ya inspeccionado?', _posteInspeccionado, _opcionesPosteInspeccionado, (val) {
+                      setState(() { _posteInspeccionado = val!; });
                     }),
                     _buildDropdownField('Poste propiedad de Inter', _posteInter, _opcionesPosteInter, (val) {
                       setState(() { _posteInter = val!; if (_posteInter == 'No') _accionPosteInterController.text = ' - '; else _accionPosteInterController.clear(); });
@@ -416,22 +551,83 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                       setState(() { _elementoFijacion = val!; });
                     }),
                     _buildTextField('Cantidad', _cantidadElementoController),
-                    _buildTextField('Geolocalización del elemento fijado', _geolocalizacionElementoController),
-                    _buildTextField('Tendido con perdida de tensión Geolocalización inicio', _tendidoInicioController),
-                    _buildTextField('Tendido con perdida de tensión Geolocalización fin', _tendidoFinController),
-                    if (_tipoCable == 'Cable alimentador') ...[
-                      _buildTextFieldReservas('Reservas $_hilos Actual', (val) => setState(() => _reservasActual = val), _reservasActual),
-                      _buildTextFieldReservas('Reservas $_hilos Acción', (val) => setState(() => _reservasAccion = val), _reservasAccion),
-                    ] else ...[
-                      _buildDropdownField('Reservas 12H Actual', _reservasActual.isNotEmpty ? _reservasActual : _opcionesReservasDistribucion[0], _opcionesReservasDistribucion, (val) {
-                        setState(() { _reservasActual = val!; });
-                      }),
-                      _buildDropdownField('Reservas 12H Acción', _reservasAccion.isNotEmpty ? _reservasAccion : _opcionesReservasDistribucion[0], _opcionesReservasDistribucion, (val) {
-                        setState(() { _reservasAccion = val!; });
-                      }),
-                    ],
-                    _buildTextField('Geolocalización de zona poda inicio', _zonasPodaInicioController),
-                    _buildTextField('Geolocalización de zona poda fin', _zonasPodaFinController),
+                    // Tendido con perdida de tensión geolocalización actual/acción
+                    _buildDropdownField('Tendido con perdida de tensión geolocalización actual', _tendidoActual, _opcionesTendidoActual, (val) { setState(() { _tendidoActual = val!; }); }),
+                    _buildDropdownField('Tendido con perdida de tensión geolocalización acción', _tendidoAccion, _opcionesTendidoAccion, (val) { setState(() { _tendidoAccion = val!; }); }),
+                    _buildDropdownField('Reservas Actual', _reservasActual.isNotEmpty ? _reservasActual : _opcionesReservasActual[0], _opcionesReservasActual, (val) {
+                      setState(() { _reservasActual = val!; });
+                    }),
+                    _buildDropdownField('Reservas Acción', _reservasAccion.isNotEmpty ? _reservasAccion : _opcionesReservasAccion[0], _opcionesReservasAccion, (val) {
+                      setState(() { _reservasAccion = val!; });
+                    }),
+                    GeoField(
+                      controller: _zonasPodaInicioController,
+                      label: 'Geolocalización de zona poda inicio',
+                    ),
+                    GeoField(
+                      controller: _zonasPodaFinController,
+                      label: 'Geolocalización de zona poda fin',
+                    ),
+                    if (_tipoCable == '4 Hilos')
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8.0),
+                        child: Card(
+                          elevation: 2,
+                          child: Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text("Mediciones (Puertos 1-16) 1550nm:", style: TextStyle(fontWeight: FontWeight.bold)),
+                                Table(
+                                  border: TableBorder.all(color: Colors.grey),
+                                  children: List.generate(4, (r) =>
+                                    TableRow(
+                                      children: List.generate(4, (c) =>
+                                        Padding(
+                                          padding: const EdgeInsets.all(4.0),
+                                          child: TextFormField(
+                                            controller: _medicionesPuertos1550[r * 4 + c],
+                                            keyboardType: TextInputType.text,
+                                            decoration: InputDecoration(
+                                              labelText: "P${r * 4 + c + 1}",
+                                              isDense: true,
+                                              border: const OutlineInputBorder(),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                const Text("Mediciones (Puertos 1-16) 1490nm:", style: TextStyle(fontWeight: FontWeight.bold)),
+                                Table(
+                                  border: TableBorder.all(color: Colors.grey),
+                                  children: List.generate(4, (r) =>
+                                    TableRow(
+                                      children: List.generate(4, (c) =>
+                                        Padding(
+                                          padding: const EdgeInsets.all(4.0),
+                                          child: TextFormField(
+                                            controller: _medicionesPuertos1490[r * 4 + c],
+                                            keyboardType: TextInputType.text,
+                                            decoration: InputDecoration(
+                                              labelText: "P${r * 4 + c + 1}",
+                                              isDense: true,
+                                              border: const OutlineInputBorder(),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
                     _buildTextField('Observaciones', _observacionesController),
                     _buildTextField('Trabajos pendientes', _trabajosPendientesController),
                     const SizedBox(height: 12),
@@ -442,6 +638,11 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                           icon: Icon(_editNro == null ? Icons.add : Icons.edit),
                           label: Text(_editNro == null ? 'Guardar' : 'Actualizar'),
                           onPressed: _grabarFila,
+                        ),
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.save),
+                          label: const Text('Save'),
+                          onPressed: _saveDraft,
                         ),
                         ElevatedButton.icon(
                           icon: const Icon(Icons.picture_as_pdf),
@@ -492,6 +693,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
               ),
             ),
           ),
+          // Tabla
           Expanded(
             flex: 1,
             child: Container(
@@ -511,14 +713,10 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                         child: DataTable(
                           columns: [
                             const DataColumn(label: Text('Nro')),
-                            const DataColumn(label: Text('Unidad Negocio')),
-                            const DataColumn(label: Text('Tipo cable')),
-                            const DataColumn(label: Text('Hilos')),
-                            DataColumn(label: Text(labelTramo)),
                             const DataColumn(label: Text('Obs. Diseño')),
                             const DataColumn(label: Text('Poste Inter')),
                             const DataColumn(label: Text('Acción Poste Inter')),
-                            const DataColumn(label: Text('Materiales')),
+                            const DataColumn(label: Text('Poste inspeccionado')),
                             DataColumn(label: Text(labelSoporteRetencion)),
                             DataColumn(label: Text(labelSoporteSuspension)),
                             const DataColumn(label: Text('Morsetería')),
@@ -527,12 +725,12 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                             const DataColumn(label: Text('Elemento de fijación')),
                             const DataColumn(label: Text('Cantidad')),
                             const DataColumn(label: Text('Geolocalización')),
-                            const DataColumn(label: Text('Tendido inicio')),
-                            const DataColumn(label: Text('Tendido fin')),
+                            const DataColumn(label: Text('Tendido Actual')),
+                            const DataColumn(label: Text('Tendido Acción')),
                             const DataColumn(label: Text('Reservas Actual')),
                             const DataColumn(label: Text('Reservas Acción')),
-                            const DataColumn(label: Text('Zonas poda inicio')),
-                            const DataColumn(label: Text('Zonas poda fin')),
+                            if (_tipoCable == '4 Hilos') const DataColumn(label: Text('Mediciones 1550nm')),
+                            if (_tipoCable == '4 Hilos') const DataColumn(label: Text('Mediciones 1490nm')),
                             const DataColumn(label: Text('Observaciones')),
                             const DataColumn(label: Text('Trabajos pendientes')),
                           ],
@@ -540,14 +738,10 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                             return DataRow(
                               cells: [
                                 DataCell(Text('${fila['contador']}')),
-                                DataCell(Text(fila['unidadNegocio'] ?? '')),
-                                DataCell(Text(fila['tipoCable'] ?? '')),
-                                DataCell(Text(fila['hilos'] ?? '')),
-                                DataCell(Text(fila['identificacionTramo'] ?? '')),
                                 DataCell(Text(fila['observacionesDiseno'] ?? '')),
                                 DataCell(Text(fila['posteInter'] ?? '')),
                                 DataCell(Text(fila['accionPosteInter'] ?? '')),
-                                DataCell(Text(fila['materialesUtilizados'] ?? '')),
+                                DataCell(Text(fila['posteInspeccionado'] ?? '')),
                                 DataCell(Text(fila['soporteRetencion'] ?? '')),
                                 DataCell(Text(fila['soporteSuspension'] ?? '')),
                                 DataCell(Text(fila['morseteriaIdentificada'] ?? '')),
@@ -556,12 +750,46 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                                 DataCell(Text(fila['elementoFijacion'] ?? '')),
                                 DataCell(Text(fila['cantidadElemento'] ?? '')),
                                 DataCell(Text(fila['geolocalizacionElemento'] ?? '')),
-                                DataCell(Text(fila['tendidoInicio'] ?? '')),
-                                DataCell(Text(fila['tendidoFin'] ?? '')),
+                                DataCell(Text(fila['tendidoActual'] ?? '')),
+                                DataCell(Text(fila['tendidoAccion'] ?? '')),
                                 DataCell(Text(fila['reservasActual'] ?? '')),
                                 DataCell(Text(fila['reservasAccion'] ?? '')),
-                                DataCell(Text(fila['zonasPodaInicio'] ?? '')),
-                                DataCell(Text(fila['zonasPodaFin'] ?? '')),
+                                if (_tipoCable == '4 Hilos')
+                                  DataCell(
+                                    Table(
+                                      border: TableBorder.all(color: Colors.grey),
+                                      children: List.generate(16, (i) =>
+                                        TableRow(children: [
+                                          Padding(
+                                            padding: const EdgeInsets.all(2),
+                                            child: Text(
+                                              "P${i+1}: "
+                                                "${fila['medicionesPuertos1550'] != null && fila['medicionesPuertos1550'].length > i ? fila['medicionesPuertos1550'][i] : ''} dBm",
+                                              style: const TextStyle(fontSize: 10, fontFamily: 'monospace'),
+                                            ),
+                                          ),
+                                        ]),
+                                      ),
+                                    ),
+                                  ),
+                                if (_tipoCable == '4 Hilos')
+                                  DataCell(
+                                    Table(
+                                      border: TableBorder.all(color: Colors.grey),
+                                      children: List.generate(16, (i) =>
+                                        TableRow(children: [
+                                          Padding(
+                                            padding: const EdgeInsets.all(2),
+                                            child: Text(
+                                              "P${i+1}: "
+                                                "${fila['medicionesPuertos1490'] != null && fila['medicionesPuertos1490'].length > i ? fila['medicionesPuertos1490'][i] : ''} dBm",
+                                              style: const TextStyle(fontSize: 10, fontFamily: 'monospace'),
+                                            ),
+                                          ),
+                                        ]),
+                                      ),
+                                    ),
+                                  ),
                                 DataCell(Text(fila['observaciones'] ?? '')),
                                 DataCell(Text(fila['trabajosPendientes'] ?? '')),
                               ],
@@ -571,6 +799,13 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                       ),
                     ),
                   ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                    child: Text(
+                      "Total de postes inspeccionados: $totalPostesInspeccionados",
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                  )
                 ],
               ),
             ),
@@ -591,21 +826,6 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
           border: const OutlineInputBorder(),
           isDense: true,
         ),
-      ),
-    );
-  }
-
-  Widget _buildTextFieldReservas(String label, Function(String) onChanged, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: TextFormField(
-        initialValue: value,
-        decoration: InputDecoration(
-          labelText: label,
-          border: const OutlineInputBorder(),
-          isDense: true,
-        ),
-        onChanged: onChanged,
       ),
     );
   }
