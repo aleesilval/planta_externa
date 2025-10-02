@@ -41,8 +41,8 @@ class _WelcomePageState extends State<WelcomePage> {
               value: _selectedPlanilla,
               items: const [
                 DropdownMenuItem(value: 1, child: Text('Auditoria de Mantenimiento ')),
-                DropdownMenuItem(value: 2, child: Text('Inspeccion de red')),
-                DropdownMenuItem(value: 3, child: Text('Planilla 3')),
+                DropdownMenuItem(value: 2, child: Text('NAP Register')),
+                DropdownMenuItem(value: 3, child: Text('Informe de Reparacion')),
               ],
               onChanged: (val) => setState(() => _selectedPlanilla = val ?? 1),
             ),

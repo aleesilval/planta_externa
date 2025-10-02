@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:pdf/widgets.dart' as pw;
+// ignore: unused_import
+import 'package:printing/printing.dart';
 import 'report_logic.dart';
 
 class ReportGeneratorScreen extends StatefulWidget {
-  const ReportGeneratorScreen({Key? key}) : super(key: key);
+  const ReportGeneratorScreen({super.key});
 
   @override
   State<ReportGeneratorScreen> createState() => _ReportGeneratorScreenState();
@@ -13,7 +15,7 @@ class ReportGeneratorScreen extends StatefulWidget {
 
 class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
   // Campos fijos
-  final TextEditingController _instaladorController = TextEditingController();
+  final TextEditingController _tecnicoController = TextEditingController();
   final TextEditingController _unidadNegocioController = TextEditingController();
   DateTime _fechaActual = DateTime.now();
   Position? _ubicacionActual;
@@ -66,11 +68,28 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
   // Nomenclatura final generada
   String _nomenclatura = "";
 
+  // Campos específicos para NAP
+  final TextEditingController _tipoInstalacionController = TextEditingController();
+  final TextEditingController _distanciaNapFdtController = TextEditingController();
+  final TextEditingController _distanciaFdtOdfController = TextEditingController();
+  final TextEditingController _cantidadEmpalmesController = TextEditingController();
+  final TextEditingController _referenciaOltController = TextEditingController();
+  
+  String? _longitudOnda;
+  String? _tipoSplitter;
+  String? _splitterSeleccionado;
+  
+  // Controladores para mediciones de puertos
+  final Map<int, TextEditingController> _medicionesPuertos = {};
+  
+  // Archivo PDF de trazas OTDR
+  PlatformFile? _archivoOtdr;
+
   // Secciones de fotos y adjuntos
-  Map<String, List<PlatformFile>> _fotosPorSeccion = {};
+  final Map<String, List<PlatformFile>> _fotosPorSeccion = {};
 
   // Control de pestañas retraíbles
-  Map<String, bool> _seccionesExpand = {};
+  final Map<String, bool> _seccionesExpand = {};
 
   bool _generando = false;
 
@@ -86,7 +105,9 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
       setState(() {
         _ubicacionActual = pos;
       });
-    } catch (e) {}
+    } catch (e) {
+      // Ignore location errors
+    }
   }
 
   void _actualizarNomenclatura() {
@@ -98,7 +119,7 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
   String _getNomenclatura() {
     switch (_elementoSeleccionado) {
       case "NAP":
-        return "M${_napCampos['FDT padre']?.text ?? ""}-CS${_napCampos['Nro Distribución Secundario']?.text ?? ""}-M${_napCampos['Nro de NAP']?.text ?? ""}";
+        return "M${_napCampos['FDT padre']?.text ?? ""}-CS${_napCampos['Nro Distribución Secundario']?.text ?? ""}-N${_napCampos['Nro de NAP']?.text ?? ""}";
       case "Closure":
         switch (_closureNaturaleza) {
           case "Distribucion":
@@ -185,10 +206,55 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
         _buildCampoNomenclatura(_napCampos, 'Nro Distribución Secundario', "Nro Distribución Secundario"),
         _buildCampoNomenclatura(_napCampos, 'Nro de NAP', "Nro de NAP"),
       ]);
+      
+      // Campos adicionales para NAP
+      if (_nomenclatura.isNotEmpty) {
+        campos.addAll([
+          const SizedBox(height: 16),
+          const Text("Información Técnica", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          TextField(
+            controller: _tipoInstalacionController,
+            decoration: const InputDecoration(labelText: "Tipo de Instalación"),
+          ),
+          TextField(
+            controller: _distanciaNapFdtController,
+            decoration: const InputDecoration(labelText: "Distancia NAP a FDT"),
+            keyboardType: TextInputType.number,
+          ),
+          TextField(
+            controller: _distanciaFdtOdfController,
+            decoration: const InputDecoration(labelText: "Distancia FDT a ODF"),
+            keyboardType: TextInputType.number,
+          ),
+          TextField(
+            controller: _cantidadEmpalmesController,
+            decoration: const InputDecoration(labelText: "Cantidad de empalmes desde ODF"),
+            keyboardType: TextInputType.number,
+          ),
+          TextField(
+            controller: _referenciaOltController,
+            decoration: const InputDecoration(labelText: "Referencia OLT"),
+          ),
+          DropdownButtonFormField<String>(
+            initialValue: _longitudOnda,
+            items: ["1310", "1490", "1550"].map((s) => DropdownMenuItem(value: s, child: Text("${s}nm"))).toList(),
+            onChanged: (v) {
+              setState(() {
+                _longitudOnda = v;
+                _tipoSplitter = null;
+                _splitterSeleccionado = null;
+                _medicionesPuertos.clear();
+              });
+            },
+            decoration: const InputDecoration(labelText: "Longitud de onda"),
+          ),
+          if (_longitudOnda != null) ..._buildSplitterConfig(),
+        ]);
+      }
     } else if (_elementoSeleccionado == "Closure") {
       campos.add(
         DropdownButtonFormField<String>(
-          value: _closureNaturaleza,
+          initialValue: _closureNaturaleza,
           items: [
             "Distribucion",
             "Continuidad",
@@ -223,7 +289,7 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
     } else if (_elementoSeleccionado == "FDT") {
       campos.add(
         DropdownButtonFormField<String>(
-          value: _fdtConClosureSecundario,
+          initialValue: _fdtConClosureSecundario,
           items: ["Si", "No"].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
           onChanged: (v) {
             setState(() {
@@ -277,126 +343,272 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
     }
   }
 
+  List<Widget> _buildSplitterConfig() {
+    List<Widget> widgets = [];
+    
+    widgets.add(
+      DropdownButtonFormField<String>(
+        initialValue: _tipoSplitter,
+        items: ["1:8", "1:16"].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+        onChanged: (v) {
+          setState(() {
+            _tipoSplitter = v;
+            _splitterSeleccionado = null;
+            _medicionesPuertos.clear();
+            if (v == "1:8") {
+              for (int i = 1; i <= 16; i++) {
+                _medicionesPuertos[i] = TextEditingController();
+              }
+            } else if (v == "1:16") {
+              for (int i = 1; i <= 16; i++) {
+                _medicionesPuertos[i] = TextEditingController();
+              }
+            }
+          });
+        },
+        decoration: const InputDecoration(labelText: "Tipo de Splitter"),
+      ),
+    );
+    
+    if (_tipoSplitter == "1:8") {
+      widgets.add(
+        DropdownButtonFormField<String>(
+          initialValue: _splitterSeleccionado,
+          items: ["Splitter 1", "Splitter 2"].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+          onChanged: (v) => setState(() => _splitterSeleccionado = v),
+          decoration: const InputDecoration(labelText: "Seleccionar Splitter"),
+        ),
+      );
+      
+      if (_splitterSeleccionado != null) {
+        int startPort = _splitterSeleccionado == "Splitter 1" ? 1 : 9;
+        int endPort = _splitterSeleccionado == "Splitter 1" ? 8 : 16;
+        widgets.add(_buildMedicionesTable(startPort, endPort, 4, 2));
+      }
+    } else if (_tipoSplitter == "1:16") {
+      widgets.add(_buildMedicionesTable(1, 16, 4, 4));
+    }
+    
+    return widgets;
+  }
+  
+  Widget _buildMedicionesTable(int startPort, int endPort, int rows, int cols) {
+    List<TableRow> tableRows = [];
+    int currentPort = startPort;
+    
+    for (int row = 0; row < rows; row++) {
+      List<Widget> cells = [];
+      for (int col = 0; col < cols; col++) {
+        if (currentPort <= endPort) {
+          cells.add(
+            Padding(
+              padding: const EdgeInsets.all(4.0),
+              child: TextField(
+                controller: _medicionesPuertos[currentPort],
+                decoration: InputDecoration(
+                  labelText: "P$currentPort",
+                  border: const OutlineInputBorder(),
+                  isDense: true,
+                ),
+                keyboardType: TextInputType.number,
+              ),
+            ),
+          );
+          currentPort++;
+        } else {
+          cells.add(const SizedBox());
+        }
+      }
+      tableRows.add(TableRow(children: cells));
+    }
+    
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Table(
+        border: TableBorder.all(),
+        children: tableRows,
+      ),
+    );
+  }
+
+  Future<void> _pickOtdrFile() async {
+    FilePickerResult? result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf'],
+    );
+    if (result != null && result.files.single.path != null) {
+      setState(() {
+        _archivoOtdr = result.files.single;
+      });
+    }
+  }
+
   Widget _buildFotosSeccion() {
     final secciones = _seccionesFotos();
     if (secciones.isEmpty) return const SizedBox.shrink();
     return Column(
-      children: secciones.map((seccion) {
-        final expanded = _seccionesExpand[seccion] ?? false;
-        final fotos = _fotosPorSeccion[seccion] ?? [];
-        return Card(
+      children: [
+        ...secciones.map((seccion) {
+          final expanded = _seccionesExpand[seccion] ?? false;
+          final fotos = _fotosPorSeccion[seccion] ?? [];
+          return Card(
+            child: ExpansionTile(
+              title: Text("$seccion (${fotos.length})"),
+              initiallyExpanded: expanded,
+              onExpansionChanged: (val) {
+                setState(() {
+                  _seccionesExpand[seccion] = val;
+                });
+              },
+              children: [
+                ElevatedButton(
+                  onPressed: () => _pickImages(seccion),
+                  child: const Text("Adjuntar Fotos"),
+                ),
+                ...fotos.asMap().entries.map((entry) => ListTile(
+                      title: Text("${seccion.replaceAll(" ", "_")}_${entry.key + 1}.${entry.value.extension}"),
+                    )),
+              ],
+            ),
+          );
+        }),
+        // Sección para cargar PDF de trazas OTDR
+        Card(
           child: ExpansionTile(
-            title: Text("$seccion (${fotos.length})"),
-            initiallyExpanded: expanded,
-            onExpansionChanged: (val) {
-              setState(() {
-                _seccionesExpand[seccion] = val;
-              });
-            },
+            title: Text("Trazas OTDR ${_archivoOtdr != null ? '(1)' : '(0)'}"),
             children: [
               ElevatedButton(
-                onPressed: () => _pickImages(seccion),
-                child: const Text("Adjuntar Fotos"),
+                onPressed: _pickOtdrFile,
+                child: const Text("Cargar PDF OTDR"),
               ),
-              ...fotos.asMap().entries.map((entry) => ListTile(
-                    title: Text("${seccion.replaceAll(" ", "_")}_${entry.key + 1}.${entry.value.extension}"),
-                  )),
+              if (_archivoOtdr != null)
+                ListTile(
+                  title: Text(_archivoOtdr!.name),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.delete),
+                    onPressed: () => setState(() => _archivoOtdr = null),
+                  ),
+                ),
             ],
           ),
-        );
-      }).toList(),
+        ),
+      ],
     );
   }
 
-  Future<void> _generarYComprimirReporte() async {
+  Future<void> _generarResumenCertificacion() async {
     setState(() => _generando = true);
 
-    // Recopilar los campos para enviar a la lógica
-    Map<String, String> campos = {};
-    if (_elementoSeleccionado == "NAP") {
-      campos = {
-        "FDT padre": _napCampos['FDT padre']?.text ?? "",
-        "Nro Distribución Secundario": _napCampos['Nro Distribución Secundario']?.text ?? "",
-        "Nro de NAP": _napCampos['Nro de NAP']?.text ?? "",
-      };
-    } else if (_elementoSeleccionado == "FDT") {
-      if (_fdtConClosureSecundario == "No") {
+    try {
+      // Recopilar los campos para enviar a la lógica
+      Map<String, String> campos = {};
+      if (_elementoSeleccionado == "NAP") {
         campos = {
-          "Closure padre": _fdtCamposNo['Closure padre']?.text ?? "",
-          "Distribucion": _fdtCamposNo['Distribucion']?.text ?? "",
-          "Nro FDT": _fdtCamposNo['Nro FDT']?.text ?? "",
+          "FDT padre": _napCampos['FDT padre']?.text ?? "",
+          "Nro Distribución Secundario": _napCampos['Nro Distribución Secundario']?.text ?? "",
+          "Nro de NAP": _napCampos['Nro de NAP']?.text ?? "",
         };
-      } else if (_fdtConClosureSecundario == "Si") {
-        campos = {
-          "Closure Secundario padre": _fdtCamposSi['Closure Secundario padre']?.text ?? "",
-          "Distribucion": _fdtCamposSi['Distribucion']?.text ?? "",
-          "Numero de FDT": _fdtCamposSi['Numero de FDT']?.text ?? "",
-        };
+      } else if (_elementoSeleccionado == "FDT") {
+        if (_fdtConClosureSecundario == "No") {
+          campos = {
+            "Closure padre": _fdtCamposNo['Closure padre']?.text ?? "",
+            "Distribucion": _fdtCamposNo['Distribucion']?.text ?? "",
+            "Nro FDT": _fdtCamposNo['Nro FDT']?.text ?? "",
+          };
+        } else if (_fdtConClosureSecundario == "Si") {
+          campos = {
+            "Closure Secundario padre": _fdtCamposSi['Closure Secundario padre']?.text ?? "",
+            "Distribucion": _fdtCamposSi['Distribucion']?.text ?? "",
+            "Numero de FDT": _fdtCamposSi['Numero de FDT']?.text ?? "",
+          };
+        }
+      } else if (_elementoSeleccionado == "Closure") {
+        switch (_closureNaturaleza) {
+          case "Distribucion":
+            campos = {
+              "Feeder": _closureDistribucionCampos['Feeder']?.text ?? "",
+              "Nro Closure": _closureDistribucionCampos['Nro Closure']?.text ?? "",
+            };
+            break;
+          case "Secundario":
+            campos = {
+              "Closure padre": _closureSecundarioCampos['Closure padre']?.text ?? "",
+              "Distribucion": _closureSecundarioCampos['Distribucion']?.text ?? "",
+              "Closure secundario": _closureSecundarioCampos['Closure secundario']?.text ?? "",
+            };
+            break;
+          case "Continuidad":
+            campos = {
+              "Nro Closure": _closureContinuidadCampos['Nro Closure']?.text ?? "",
+            };
+            break;
+          case "Reparacion":
+            campos = {
+              "Nro Closure de reparacion": _closureReparacionCampos['Nro Closure de reparacion']?.text ?? "",
+            };
+            break;
+        }
       }
-    } else if (_elementoSeleccionado == "Closure") {
-      switch (_closureNaturaleza) {
-        case "Distribucion":
-          campos = {
-            "Feeder": _closureDistribucionCampos['Feeder']?.text ?? "",
-            "Nro Closure": _closureDistribucionCampos['Nro Closure']?.text ?? "",
-          };
-          break;
-        case "Secundario":
-          campos = {
-            "Closure padre": _closureSecundarioCampos['Closure padre']?.text ?? "",
-            "Distribucion": _closureSecundarioCampos['Distribucion']?.text ?? "",
-            "Closure secundario": _closureSecundarioCampos['Closure secundario']?.text ?? "",
-          };
-          break;
-        case "Continuidad":
-          campos = {
-            "Nro Closure": _closureContinuidadCampos['Nro Closure']?.text ?? "",
-          };
-          break;
-        case "Reparacion":
-          campos = {
-            "Nro Closure de reparacion": _closureReparacionCampos['Nro Closure de reparacion']?.text ?? "",
-          };
-          break;
+
+      // Generar PDF en memoria
+      final pdf = pw.Document();
+      pdf.addPage(
+        pw.Page(
+          build: (pw.Context context) {
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text('Reporte de Instalación', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
+                pw.SizedBox(height: 16),
+                pw.Text('Técnico: ${_tecnicoController.text}'),
+                pw.Text('Fecha: ${_fechaActual.toLocal()}'),
+                pw.Text('Ubicación: ${_ubicacionActual != null ? "${_ubicacionActual!.latitude}, ${_ubicacionActual!.longitude}" : "No disponible"}'),
+                pw.Text('Unidad de Negocios: ${_unidadNegocioController.text}'),
+                pw.Text('Elemento: $_elementoSeleccionado'),
+                if (_closureNaturaleza != null) pw.Text('Naturaleza: $_closureNaturaleza'),
+                if (_fdtConClosureSecundario != null) pw.Text('¿Con closure secundario?: $_fdtConClosureSecundario'),
+                pw.SizedBox(height: 8),
+                ...campos.entries.map((e) => pw.Text('${e.key}: ${e.value}')),
+                pw.SizedBox(height: 8),
+                pw.Text('Nomenclatura generada: $_nomenclatura', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+              ],
+            );
+          },
+        ),
+      );
+
+      // Usar la función de report_logic para generar RAR
+      final success = await generateAndCompressReport(
+        instalador: _tecnicoController.text,
+        fecha: _fechaActual,
+        ubicacion: _ubicacionActual,
+        unidadNegocio: _unidadNegocioController.text,
+        elemento: _elementoSeleccionado,
+        closureNaturaleza: _closureNaturaleza,
+        fdtConClosureSecundario: _fdtConClosureSecundario,
+        campos: campos,
+        nomenclatura: _nomenclatura,
+        fotosPorSeccion: _fotosPorSeccion,
+        context: context,
+      );
+
+      if (success) {
+        // ignore: use_build_context_synchronously
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Resumen de certificación generado exitosamente')),
+        );
       }
+    } catch (e) {
+      // ignore: use_build_context_synchronously
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al generar resumen: $e')),
+      );
     }
-
-    // Generar PDF en memoria
-    final pdf = pw.Document();
-    pdf.addPage(
-      pw.Page(
-        build: (pw.Context context) {
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Text('Reporte de Instalación', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
-              pw.SizedBox(height: 16),
-              pw.Text('Instalador: ${_instaladorController.text}'),
-              pw.Text('Fecha: ${_fechaActual.toLocal()}'),
-              pw.Text('Ubicación: ${_ubicacionActual != null ? "${_ubicacionActual!.latitude}, ${_ubicacionActual!.longitude}" : "No disponible"}'),
-              pw.Text('Unidad de Negocios: ${_unidadNegocioController.text}'),
-              pw.Text('Elemento: $_elementoSeleccionado'),
-              if (_closureNaturaleza != null) pw.Text('Naturaleza: $_closureNaturaleza'),
-              if (_fdtConClosureSecundario != null) pw.Text('¿Con closure secundario?: $_fdtConClosureSecundario'),
-              pw.SizedBox(height: 8),
-              ...campos.entries.map((e) => pw.Text('${e.key}: ${e.value}')),
-              pw.SizedBox(height: 8),
-              pw.Text('Nomenclatura generada: $_nomenclatura', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-            ],
-          );
-        },
-      ),
-    );
-
-    await saveAndCompressToDownloads(
-      nomenclatura: _nomenclatura,
-      pdf: pdf,
-      fotosPorSeccion: _fotosPorSeccion,
-      context: context,
-    );
 
     setState(() => _generando = false);
   }
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -408,8 +620,8 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
           children: [
             // Campos fijos
             TextField(
-              controller: _instaladorController,
-              decoration: const InputDecoration(labelText: "Instalador"),
+              controller: _tecnicoController,
+              decoration: const InputDecoration(labelText: "Técnico"),
               maxLines: null,
               keyboardType: TextInputType.multiline,
             ),
@@ -428,7 +640,7 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
 
             // Selección de elemento principal
             DropdownButtonFormField<String>(
-              value: _elementoSeleccionado,
+              initialValue: _elementoSeleccionado,
               items: _elementos.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
               onChanged: (val) {
                 setState(() {
@@ -437,13 +649,38 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
                   _closureNaturaleza = null;
                   _fdtConClosureSecundario = null;
                   // Limpiar campos
-                  _napCampos.values.forEach((ctrl) => ctrl.clear());
-                  _fdtCamposNo.values.forEach((ctrl) => ctrl.clear());
-                  _fdtCamposSi.values.forEach((ctrl) => ctrl.clear());
-                  _closureDistribucionCampos.values.forEach((ctrl) => ctrl.clear());
-                  _closureSecundarioCampos.values.forEach((ctrl) => ctrl.clear());
-                  _closureContinuidadCampos.values.forEach((ctrl) => ctrl.clear());
-                  _closureReparacionCampos.values.forEach((ctrl) => ctrl.clear());
+                  for (var ctrl in _napCampos.values) {
+                    ctrl.clear();
+                  }
+                  for (var ctrl in _fdtCamposNo.values) {
+                    ctrl.clear();
+                  }
+                  for (var ctrl in _fdtCamposSi.values) {
+                    ctrl.clear();
+                  }
+                  for (var ctrl in _closureDistribucionCampos.values) {
+                    ctrl.clear();
+                  }
+                  for (var ctrl in _closureSecundarioCampos.values) {
+                    ctrl.clear();
+                  }
+                  for (var ctrl in _closureContinuidadCampos.values) {
+                    ctrl.clear();
+                  }
+                  for (var ctrl in _closureReparacionCampos.values) {
+                    ctrl.clear();
+                  }
+                  // Limpiar campos NAP específicos
+                  _tipoInstalacionController.clear();
+                  _distanciaNapFdtController.clear();
+                  _distanciaFdtOdfController.clear();
+                  _cantidadEmpalmesController.clear();
+                  _referenciaOltController.clear();
+                  _longitudOnda = null;
+                  _tipoSplitter = null;
+                  _splitterSeleccionado = null;
+                  _medicionesPuertos.clear();
+                  _archivoOtdr = null;
                   _fotosPorSeccion.clear();
                   _seccionesExpand.clear();
                   _nomenclatura = "";
@@ -463,14 +700,16 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
 
             const SizedBox(height: 16),
 
+
+
             // Sección de fotos/adjuntos
             _buildFotosSeccion(),
 
             const SizedBox(height: 16),
             ElevatedButton.icon(
-              icon: _generando ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.download),
-              label: const Text("GUARDAR EN DESCARGAS (ZIP)"),
-              onPressed: _generando ? null : _generarYComprimirReporte,
+              icon: _generando ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.archive),
+              label: const Text("GENERAR RESUMEN DE CERTIFICACIÓN"),
+              onPressed: _generando ? null : _generarResumenCertificacion,
             ),
           ],
         ),

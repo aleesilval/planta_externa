@@ -1,20 +1,23 @@
+// Importaciones necesarias para el formulario de auditoría
 import 'package:flutter/material.dart';
-import 'package:pdf/widgets.dart' as pw;
+import 'package:pdf/widgets.dart' as pw; // Para generar PDFs
 import 'package:pdf/pdf.dart';
-import 'package:printing/printing.dart';
-import 'package:planta_externa/geo_field.dart';
+import 'package:printing/printing.dart'; // Para imprimir/exportar PDFs
+import 'package:planta_externa/geo_field.dart'; // Widget personalizado para geolocalización
 import 'dart:io';
-import 'dart:convert';
-import 'package:path_provider/path_provider.dart';
+import 'dart:convert'; // Para JSON
+import 'package:path_provider/path_provider.dart'; // Para acceso al sistema de archivos
 
+/// Widget wrapper que contiene el formulario principal
 class FormularioPage extends StatelessWidget {
   const FormularioPage({super.key});
   @override
   Widget build(BuildContext context) {
-    return const FormularioPlantaExterna(); // ✅ Solo el widget, sin MaterialApp
+    return const FormularioPlantaExterna(); // Solo el widget, sin MaterialApp
   }
 }
 
+/// Formulario principal para auditoría de mantenimiento de planta externa
 class FormularioPlantaExterna extends StatefulWidget {
   const FormularioPlantaExterna({super.key});
   @override
@@ -22,17 +25,20 @@ class FormularioPlantaExterna extends StatefulWidget {
 }
 
 class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
-  final _formKey = GlobalKey<FormState>();
-  final List<Map<String, dynamic>> _tabla = [];
-  int _contador = 1;
-  int? _editNro;
+  // === VARIABLES DE CONTROL ===
+  final _formKey = GlobalKey<FormState>(); // Clave para validación del formulario
+  final List<Map<String, dynamic>> _tabla = []; // Lista que almacena todas las filas de datos
+  int _contador = 1; // Contador automático para numerar filas
+  int? _editNro; // Número de fila en edición (null = nueva fila)
 
-  // Persistencia local
+  // === PERSISTENCIA LOCAL ===
+  /// Obtiene la ruta del archivo local para guardar datos
   Future<File> get _localFile async {
     final directory = await getApplicationDocumentsDirectory();
     return File('${directory.path}/planilla1_data.json');
   }
 
+  /// Carga datos guardados localmente al iniciar la app
   Future<void> _cargarDatos() async {
     try {
       final file = await _localFile;
@@ -42,25 +48,27 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
         _tabla.clear();
         _tabla.addAll(jsonData.cast<Map<String, dynamic>>());
         if (_tabla.isNotEmpty) {
+          // Encuentra el contador más alto y continúa desde ahí
           _contador = _tabla.map((e) => e['contador'] as int).reduce((a, b) => a > b ? a : b) + 1;
-          _bloquearCabecera = true;
+          _bloquearCabecera = true; // Bloquea campos de cabecera si hay datos
         }
         setState(() {});
       }
-    } catch (_) {}
+    } catch (_) {} // Ignora errores de carga
   }
 
+  /// Guarda todos los datos en archivo local
   Future<void> _guardarDatos() async {
     try {
       final file = await _localFile;
       await file.writeAsString(json.encode(_tabla));
-    } catch (_) {}
+    } catch (_) {} // Ignora errores de guardado
   }
 
   @override
   void initState() {
     super.initState();
-    _cargarDatos();
+    _cargarDatos(); // Carga datos al inicializar
   }
 
   // Encabezado y controladores
@@ -621,33 +629,32 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                     _buildTextField('Observaciones', _observacionesController),
                     _buildTextField('Trabajos pendientes', _trabajosPendientesController),
                     const SizedBox(height: 12),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        ElevatedButton.icon(
-                          icon: Icon(_editNro == null ? Icons.add : Icons.edit),
-                          label: Text(_editNro == null ? 'Guardar' : 'Actualizar'),
-                          onPressed: _grabarFila,
-                        ),
-                        ElevatedButton.icon(
-                          icon: const Icon(Icons.save),
-                          label: const Text('Save'),
-                          onPressed: _saveDraft,
-                        ),
-                        ElevatedButton.icon(
-                          icon: const Icon(Icons.picture_as_pdf),
-                          label: const Text('Exportar'),
-                          onPressed: _tabla.isEmpty ? null : _exportarPDF,
-                        ),
-                        ElevatedButton.icon(
-                          icon: const Icon(Icons.cleaning_services),
-                          label: const Text('Limpiar todo'),
-                          onPressed: _limpiarTodo,
-                        ),
-                        ElevatedButton.icon(
-                          icon: const Icon(Icons.search),
-                          label: const Text('Modificar'),
-                          onPressed: () async {
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          ElevatedButton.icon(
+                            icon: Icon(_editNro == null ? Icons.add : Icons.edit),
+                            label: Text(_editNro == null ? 'Guardar' : 'Actualizar'),
+                            onPressed: _grabarFila,
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton.icon(
+                            icon: const Icon(Icons.picture_as_pdf),
+                            label: const Text('Exportar'),
+                            onPressed: _tabla.isEmpty ? null : _exportarPDF,
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton.icon(
+                            icon: const Icon(Icons.cleaning_services),
+                            label: const Text('Limpiar todo'),
+                            onPressed: _limpiarTodo,
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton.icon(
+                            icon: const Icon(Icons.search),
+                            label: const Text('Modificar'),
+                            onPressed: () async {
                             int? nro = await showDialog<int>(
                               context: context,
                               builder: (context) {
@@ -676,7 +683,8 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                             if (nro != null) _cargarFila(nro);
                           },
                         ),
-                      ],
+                        ],
+                      ),
                     ),
                   ],
                 ),
