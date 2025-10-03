@@ -10,6 +10,7 @@ import 'dart:io';
 import 'dart:convert'; // Para JSON
 import 'package:path_provider/path_provider.dart'; // Para acceso al sistema de archivos
 import 'package:file_picker/file_picker.dart'; // Para selección de archivos
+import '../data/form_data_manager.dart';
 
 /// Widget wrapper que contiene el formulario principal
 class FormularioPage extends StatelessWidget {
@@ -72,6 +73,31 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
   void initState() {
     super.initState();
     _cargarDatos(); // Carga datos al inicializar
+    _loadSavedDataFromManager();
+  }
+  
+  void _loadSavedDataFromManager() {
+    final savedData = _dataManager.getPlanilla1Data();
+    if (savedData.isNotEmpty) {
+      setState(() {
+        _unidadNegocioController.text = savedData['unidadNegocio'] ?? '';
+        _feederController.text = savedData['feeder'] ?? '';
+        _bufferController.text = savedData['buffer'] ?? '';
+        _tipoCable = savedData['tipoCable'] ?? 'Cable alimentador';
+        _hilos = savedData['hilos'] ?? 'Azul';
+        _fdtPadreController.text = savedData['fdtPadre'] ?? '';
+        if (savedData['tabla'] != null) {
+          _tabla.clear();
+          _tabla.addAll(List<Map<String, dynamic>>.from(savedData['tabla']));
+        }
+        _contador = savedData['contador'] ?? 1;
+        _bloquearCabecera = savedData['bloquearCabecera'] ?? false;
+        if (savedData['evidenciaFotografica'] != null) {
+          _evidenciaFotografica.clear();
+          _evidenciaFotografica.addAll(List<Map<String, dynamic>>.from(savedData['evidenciaFotografica']));
+        }
+      });
+    }
   }
 
   // Encabezado y controladores
@@ -128,6 +154,8 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
   // Mediciones (4 Hilos) - 16 puertos, doble tabla para 1550nm y 1490nm
   final List<TextEditingController> _medicionesPuertos1550 = List.generate(16, (i) => TextEditingController());
   final List<TextEditingController> _medicionesPuertos1490 = List.generate(16, (i) => TextEditingController());
+  
+  final FormDataManager _dataManager = FormDataManager();
 
   // Opciones
   final List<String> _opcionesTipoCable = [
@@ -381,6 +409,23 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
 
   Future<void> _saveDraft() async {
     await _guardarDatos();
+    
+    // Save to data manager for cross-planilla persistence
+    final dataToSave = {
+      'unidadNegocio': _unidadNegocioController.text,
+      'feeder': _feederController.text,
+      'buffer': _bufferController.text,
+      'tipoCable': _tipoCable,
+      'hilos': _hilos,
+      'fdtPadre': _fdtPadreController.text,
+      'tabla': List.from(_tabla),
+      'contador': _contador,
+      'bloquearCabecera': _bloquearCabecera,
+      'evidenciaFotografica': List.from(_evidenciaFotografica),
+    };
+    
+    _dataManager.savePlanilla1Data(dataToSave);
+    
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Progreso guardado localmente')),
     );

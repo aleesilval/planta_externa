@@ -50,14 +50,9 @@ Future<bool> generateAndCompressReport({
       ),
     );
 
-    final tempDir = await getTemporaryDirectory();
-    final pdfPath = '${tempDir.path}/reporte.pdf';
-    final pdfFile = File(pdfPath);
-    await pdfFile.writeAsBytes(await pdf.save());
-
     final archive = Archive();
-
-    archive.addFile(ArchiveFile('Reporte_$nomenclatura.pdf', await pdfFile.length(), await pdfFile.readAsBytes()));
+    final pdfName = nomenclatura.isNotEmpty ? '$nomenclatura.pdf' : 'reporte.pdf';
+    archive.addFile(ArchiveFile(pdfName, (await pdf.save()).length, await pdf.save()));
 
     for (final entry in fotosPorSeccion.entries) {
       final seccion = entry.key;
@@ -74,7 +69,8 @@ Future<bool> generateAndCompressReport({
     }
 
     final downloadsDir = await getDownloadsDirectory();
-    final zipPath = '${downloadsDir!.path}/Reporte_${nomenclatura.isNotEmpty ? nomenclatura : DateTime.now().millisecondsSinceEpoch}.zip';
+    final zipName = nomenclatura.isNotEmpty ? '$nomenclatura.zip' : 'reporte.zip';
+    final zipPath = '${downloadsDir!.path}/$zipName';
     final zipFile = File(zipPath);
     await zipFile.writeAsBytes(ZipEncoder().encode(archive)!);
 

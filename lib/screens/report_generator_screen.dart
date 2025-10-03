@@ -5,6 +5,7 @@ import 'package:pdf/widgets.dart' as pw;
 // ignore: unused_import
 import 'package:printing/printing.dart';
 import 'report_logic.dart';
+import '../data/form_data_manager.dart';
 
 class ReportGeneratorScreen extends StatefulWidget {
   const ReportGeneratorScreen({super.key});
@@ -17,6 +18,10 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
   // Campos fijos
   final TextEditingController _tecnicoController = TextEditingController();
   final TextEditingController _unidadNegocioController = TextEditingController();
+  final TextEditingController _feederController = TextEditingController();
+  final TextEditingController _closureController = TextEditingController();
+  final TextEditingController _bufferController = TextEditingController();
+  final TextEditingController _hiloController = TextEditingController();
   DateTime _fechaActual = DateTime.now();
   Position? _ubicacionActual;
 
@@ -68,16 +73,23 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
   // Nomenclatura final generada
   String _nomenclatura = "";
 
-  // Campos específicos para NAP
-  final TextEditingController _tipoInstalacionController = TextEditingController();
+  // Campos técnicos comunes
+  String _tipoInstalacion = 'Aerea';
   final TextEditingController _distanciaNapFdtController = TextEditingController();
   final TextEditingController _distanciaFdtOdfController = TextEditingController();
   final TextEditingController _cantidadEmpalmesController = TextEditingController();
-  final TextEditingController _referenciaOltController = TextEditingController();
+  final TextEditingController _tipoSplitterController = TextEditingController();
+  final TextEditingController _cantidadSplitterController = TextEditingController();
+  String _contieneEtiquetaIdentificacion = 'Si';
+  String _armadoBajoNorma = 'Si';
+  String _fijacionBajoNorma = 'Si';
+  final TextEditingController _cantidadCablesSalidaController = TextEditingController();
+  bool _datosListos = false;
+  
+  // Mediciones guardadas
+  final Map<String, Map<int, String>> _medicionesGuardadas = {};
   
   String? _longitudOnda;
-  String? _tipoSplitter;
-  String? _splitterSeleccionado;
   
   // Controladores para mediciones de puertos
   final Map<int, TextEditingController> _medicionesPuertos = {};
@@ -91,12 +103,46 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
   // Control de pestañas retraíbles
   final Map<String, bool> _seccionesExpand = {};
 
+  // Distribución por buffer para Closure Distribución
+  final List<String> _distribucionBuffers = [];
+  String? _bufferSeleccionado;
+
   bool _generando = false;
+  final FormDataManager _dataManager = FormDataManager();
 
   @override
   void initState() {
     super.initState();
     _obtenerUbicacion();
+    _loadSavedData();
+  }
+  
+  void _loadSavedData() {
+    final savedData = _dataManager.getPlanilla2Data();
+    if (savedData.isNotEmpty) {
+      setState(() {
+        _tecnicoController.text = savedData['tecnico'] ?? '';
+        _unidadNegocioController.text = savedData['unidadNegocio'] ?? '';
+        _feederController.text = savedData['feeder'] ?? '';
+        _closureController.text = savedData['closure'] ?? '';
+        _bufferController.text = savedData['buffer'] ?? '';
+        _hiloController.text = savedData['hilo'] ?? '';
+        _elementoSeleccionado = savedData['elemento'];
+        _closureNaturaleza = savedData['closureNaturaleza'];
+        _fdtConClosureSecundario = savedData['fdtConClosureSecundario'];
+        _nomenclatura = savedData['nomenclatura'] ?? '';
+        _tipoInstalacion = savedData['tipoInstalacion'] ?? 'Aerea';
+        _contieneEtiquetaIdentificacion = savedData['contieneEtiquetaIdentificacion'] ?? 'Si';
+        _armadoBajoNorma = savedData['armadoBajoNorma'] ?? 'Si';
+        _fijacionBajoNorma = savedData['fijacionBajoNorma'] ?? 'Si';
+        _longitudOnda = savedData['longitudOnda'];
+        _datosListos = savedData['datosListos'] ?? false;
+        if (savedData['distribucionBuffers'] != null) {
+          _distribucionBuffers.clear();
+          _distribucionBuffers.addAll(List<String>.from(savedData['distribucionBuffers']));
+        }
+      });
+    }
   }
 
   Future<void> _obtenerUbicacion() async {
@@ -207,49 +253,8 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
         _buildCampoNomenclatura(_napCampos, 'Nro de NAP', "Nro de NAP"),
       ]);
       
-      // Campos adicionales para NAP
       if (_nomenclatura.isNotEmpty) {
-        campos.addAll([
-          const SizedBox(height: 16),
-          const Text("Información Técnica", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          TextField(
-            controller: _tipoInstalacionController,
-            decoration: const InputDecoration(labelText: "Tipo de Instalación"),
-          ),
-          TextField(
-            controller: _distanciaNapFdtController,
-            decoration: const InputDecoration(labelText: "Distancia NAP a FDT"),
-            keyboardType: TextInputType.number,
-          ),
-          TextField(
-            controller: _distanciaFdtOdfController,
-            decoration: const InputDecoration(labelText: "Distancia FDT a ODF"),
-            keyboardType: TextInputType.number,
-          ),
-          TextField(
-            controller: _cantidadEmpalmesController,
-            decoration: const InputDecoration(labelText: "Cantidad de empalmes desde ODF"),
-            keyboardType: TextInputType.number,
-          ),
-          TextField(
-            controller: _referenciaOltController,
-            decoration: const InputDecoration(labelText: "Referencia OLT"),
-          ),
-          DropdownButtonFormField<String>(
-            initialValue: _longitudOnda,
-            items: ["1310", "1490", "1550"].map((s) => DropdownMenuItem(value: s, child: Text("${s}nm"))).toList(),
-            onChanged: (v) {
-              setState(() {
-                _longitudOnda = v;
-                _tipoSplitter = null;
-                _splitterSeleccionado = null;
-                _medicionesPuertos.clear();
-              });
-            },
-            decoration: const InputDecoration(labelText: "Longitud de onda"),
-          ),
-          if (_longitudOnda != null) ..._buildSplitterConfig(),
-        ]);
+        campos.add(_buildInformeTecnico());
       }
     } else if (_elementoSeleccionado == "Closure") {
       campos.add(
@@ -286,6 +291,10 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
       } else if (_closureNaturaleza == "Reparacion") {
         campos.add(_buildCampoNomenclatura(_closureReparacionCampos, 'Nro Closure de reparacion', "Nro Closure de reparacion"));
       }
+      
+      if (_nomenclatura.isNotEmpty) {
+        campos.add(_buildInformeTecnico());
+      }
     } else if (_elementoSeleccionado == "FDT") {
       campos.add(
         DropdownButtonFormField<String>(
@@ -313,8 +322,178 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
           _buildCampoNomenclatura(_fdtCamposSi, 'Numero de FDT', "Numero de FDT"),
         ]);
       }
+      
+      if (_nomenclatura.isNotEmpty) {
+        campos.add(_buildInformeTecnico());
+      }
     }
     return Column(children: campos);
+  }
+  
+  Widget _buildInformeTecnico() {
+    return Card(
+      child: ExpansionTile(
+        title: Text('Información Técnica $_elementoSeleccionado'),
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              children: _buildCamposInformeTecnico(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  List<Widget> _buildCamposInformeTecnico() {
+    List<Widget> campos = [];
+    
+    // Campos comunes para todos los elementos
+    campos.addAll([
+      DropdownButtonFormField<String>(
+        initialValue: _tipoInstalacion,
+        items: ['Aerea', 'Subterranea'].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+        onChanged: (v) => setState(() => _tipoInstalacion = v!),
+        decoration: const InputDecoration(labelText: "Tipo de Instalación"),
+      ),
+      const SizedBox(height: 8),
+    ]);
+    
+    // Campos de splitter solo para NAP y FDT, no para Closure
+    if (_elementoSeleccionado != "Closure") {
+      campos.addAll([
+        DropdownButtonFormField<String>(
+          items: ['1:4', '1:8', '1:16'].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+          onChanged: (v) => _tipoSplitterController.text = v ?? '',
+          decoration: const InputDecoration(labelText: "Tipo de Splitter"),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _cantidadSplitterController,
+          decoration: const InputDecoration(labelText: "Cantidad de Splitter"),
+          keyboardType: TextInputType.number,
+        ),
+        const SizedBox(height: 8),
+      ]);
+    }
+    
+    campos.addAll([
+      DropdownButtonFormField<String>(
+        initialValue: _contieneEtiquetaIdentificacion,
+        items: ['Si', 'No'].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+        onChanged: (v) => setState(() => _contieneEtiquetaIdentificacion = v!),
+        decoration: const InputDecoration(labelText: "Contiene etiqueta de identificacion"),
+      ),
+      const SizedBox(height: 8),
+      DropdownButtonFormField<String>(
+        initialValue: _armadoBajoNorma,
+        items: ['Si', 'No'].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+        onChanged: (v) => setState(() => _armadoBajoNorma = v!),
+        decoration: const InputDecoration(labelText: "Armado bajo norma"),
+      ),
+      const SizedBox(height: 8),
+      DropdownButtonFormField<String>(
+        initialValue: _fijacionBajoNorma,
+        items: ['Si', 'No'].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+        onChanged: (v) => setState(() => _fijacionBajoNorma = v!),
+        decoration: const InputDecoration(labelText: "Fijación bajo norma"),
+      ),
+      const SizedBox(height: 8),
+      TextField(
+        controller: _cantidadCablesSalidaController,
+        decoration: const InputDecoration(labelText: "Cantidad de cables de salida"),
+        keyboardType: TextInputType.number,
+      ),
+    ]);
+    
+    // Campo especial para Closure con Naturaleza Distribución
+    if (_elementoSeleccionado == "Closure" && _closureNaturaleza == "Distribucion") {
+      campos.addAll([
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: DropdownButtonFormField<String>(
+                value: _bufferSeleccionado,
+                items: ['Azul', 'Naranja', 'Verde', 'Marron', 'Gris', 'Blanco', 'Rojo', 'Negro', 'Amarillo', 'Violeta', 'Rosa', 'Aqua']
+                    .map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                onChanged: (v) => setState(() => _bufferSeleccionado = v),
+                decoration: const InputDecoration(labelText: "Selección de Buffer"),
+              ),
+            ),
+            const SizedBox(width: 8),
+            ElevatedButton(
+              onPressed: _bufferSeleccionado != null ? _agregarBuffer : null,
+              child: const Text("Agregar Buffer"),
+            ),
+          ],
+        ),
+        if (_distribucionBuffers.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          const Text("Distribución por buffer:", style: TextStyle(fontWeight: FontWeight.bold)),
+          ..._distribucionBuffers.asMap().entries.map((entry) => 
+            ListTile(
+              title: Text(entry.value),
+              trailing: IconButton(
+                icon: const Icon(Icons.delete),
+                onPressed: () => _eliminarBuffer(entry.key),
+              ),
+            )
+          ),
+        ],
+      ]);
+    }
+    
+    // Campos específicos para NAP
+    if (_elementoSeleccionado == "NAP") {
+      campos.addAll([
+        const SizedBox(height: 8),
+        TextField(
+          controller: _distanciaNapFdtController,
+          decoration: const InputDecoration(labelText: "Distancia NAP a FDT (mts)"),
+          keyboardType: TextInputType.number,
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _distanciaFdtOdfController,
+          decoration: const InputDecoration(labelText: "Distancia FDT a ODF (mts)"),
+          keyboardType: TextInputType.number,
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _cantidadEmpalmesController,
+          decoration: const InputDecoration(labelText: "Cantidad de empalmes desde ODF"),
+          keyboardType: TextInputType.number,
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: DropdownButtonFormField<String>(
+                initialValue: _longitudOnda,
+                items: ["1490", "1550"].map((s) => DropdownMenuItem(value: s, child: Text("${s}nm"))).toList(),
+                onChanged: (v) {
+                  setState(() {
+                    _longitudOnda = v;
+                    _cargarMedicionesLongitudOnda();
+                  });
+                },
+                decoration: const InputDecoration(labelText: "Longitud de onda"),
+              ),
+            ),
+            const SizedBox(width: 16),
+            ElevatedButton(
+              onPressed: _longitudOnda != null ? _guardarMediciones : null,
+              child: const Text("Guardar Mediciones"),
+            ),
+          ],
+        ),
+        if (_longitudOnda != null) _buildMedicionesTable(),
+      ]);
+    }
+    
+    return campos;
   }
 
   Widget _buildCampoNomenclatura(Map<String, TextEditingController> map, String key, String label) {
@@ -343,92 +522,69 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
     }
   }
 
-  List<Widget> _buildSplitterConfig() {
-    List<Widget> widgets = [];
-    
-    widgets.add(
-      DropdownButtonFormField<String>(
-        initialValue: _tipoSplitter,
-        items: ["1:8", "1:16"].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
-        onChanged: (v) {
-          setState(() {
-            _tipoSplitter = v;
-            _splitterSeleccionado = null;
-            _medicionesPuertos.clear();
-            if (v == "1:8") {
-              for (int i = 1; i <= 16; i++) {
-                _medicionesPuertos[i] = TextEditingController();
-              }
-            } else if (v == "1:16") {
-              for (int i = 1; i <= 16; i++) {
-                _medicionesPuertos[i] = TextEditingController();
-              }
-            }
-          });
-        },
-        decoration: const InputDecoration(labelText: "Tipo de Splitter"),
-      ),
-    );
-    
-    if (_tipoSplitter == "1:8") {
-      widgets.add(
-        DropdownButtonFormField<String>(
-          initialValue: _splitterSeleccionado,
-          items: ["Splitter 1", "Splitter 2"].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
-          onChanged: (v) => setState(() => _splitterSeleccionado = v),
-          decoration: const InputDecoration(labelText: "Seleccionar Splitter"),
-        ),
-      );
-      
-      if (_splitterSeleccionado != null) {
-        int startPort = _splitterSeleccionado == "Splitter 1" ? 1 : 9;
-        int endPort = _splitterSeleccionado == "Splitter 1" ? 8 : 16;
-        widgets.add(_buildMedicionesTable(startPort, endPort, 4, 2));
+  Widget _buildMedicionesTable() {
+    if (_medicionesPuertos.isEmpty) {
+      for (int i = 1; i <= 16; i++) {
+        _medicionesPuertos[i] = TextEditingController();
       }
-    } else if (_tipoSplitter == "1:16") {
-      widgets.add(_buildMedicionesTable(1, 16, 4, 4));
     }
     
-    return widgets;
-  }
-  
-  Widget _buildMedicionesTable(int startPort, int endPort, int rows, int cols) {
     List<TableRow> tableRows = [];
-    int currentPort = startPort;
-    
-    for (int row = 0; row < rows; row++) {
+    for (int row = 0; row < 4; row++) {
       List<Widget> cells = [];
-      for (int col = 0; col < cols; col++) {
-        if (currentPort <= endPort) {
-          cells.add(
-            Padding(
-              padding: const EdgeInsets.all(4.0),
-              child: TextField(
-                controller: _medicionesPuertos[currentPort],
-                decoration: InputDecoration(
-                  labelText: "P$currentPort",
-                  border: const OutlineInputBorder(),
-                  isDense: true,
-                ),
-                keyboardType: TextInputType.number,
+      for (int col = 0; col < 4; col++) {
+        int puerto = row * 4 + col + 1;
+        cells.add(
+          Padding(
+            padding: const EdgeInsets.all(4.0),
+            child: TextField(
+              controller: _medicionesPuertos[puerto],
+              decoration: InputDecoration(
+                labelText: "P$puerto",
+                border: const OutlineInputBorder(),
+                isDense: true,
               ),
+              keyboardType: TextInputType.number,
             ),
-          );
-          currentPort++;
-        } else {
-          cells.add(const SizedBox());
-        }
+          ),
+        );
       }
       tableRows.add(TableRow(children: cells));
     }
     
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Table(
-        border: TableBorder.all(),
-        children: tableRows,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Mediciones ${_longitudOnda}nm', style: const TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Table(
+            border: TableBorder.all(),
+            children: tableRows,
+          ),
+        ],
       ),
     );
+  }
+  
+  void _cargarMedicionesLongitudOnda() {
+    if (_longitudOnda == null) return;
+    
+    // Limpiar controladores actuales
+    for (var controller in _medicionesPuertos.values) {
+      controller.clear();
+    }
+    
+    // Cargar mediciones guardadas si existen
+    if (_medicionesGuardadas.containsKey('${_longitudOnda}nm')) {
+      final mediciones = _medicionesGuardadas['${_longitudOnda}nm']!;
+      mediciones.forEach((puerto, valor) {
+        if (_medicionesPuertos.containsKey(puerto)) {
+          _medicionesPuertos[puerto]!.text = valor;
+        }
+      });
+    }
   }
 
   Future<void> _pickOtdrFile() async {
@@ -495,89 +651,28 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
       ],
     );
   }
-
-  Future<void> _generarResumenCertificacion() async {
+  Future<void> _previsualizarInforme() async {
     setState(() => _generando = true);
 
     try {
-      // Recopilar los campos para enviar a la lógica
-      Map<String, String> campos = {};
-      if (_elementoSeleccionado == "NAP") {
-        campos = {
-          "FDT padre": _napCampos['FDT padre']?.text ?? "",
-          "Nro Distribución Secundario": _napCampos['Nro Distribución Secundario']?.text ?? "",
-          "Nro de NAP": _napCampos['Nro de NAP']?.text ?? "",
-        };
-      } else if (_elementoSeleccionado == "FDT") {
-        if (_fdtConClosureSecundario == "No") {
-          campos = {
-            "Closure padre": _fdtCamposNo['Closure padre']?.text ?? "",
-            "Distribucion": _fdtCamposNo['Distribucion']?.text ?? "",
-            "Nro FDT": _fdtCamposNo['Nro FDT']?.text ?? "",
-          };
-        } else if (_fdtConClosureSecundario == "Si") {
-          campos = {
-            "Closure Secundario padre": _fdtCamposSi['Closure Secundario padre']?.text ?? "",
-            "Distribucion": _fdtCamposSi['Distribucion']?.text ?? "",
-            "Numero de FDT": _fdtCamposSi['Numero de FDT']?.text ?? "",
-          };
-        }
-      } else if (_elementoSeleccionado == "Closure") {
-        switch (_closureNaturaleza) {
-          case "Distribucion":
-            campos = {
-              "Feeder": _closureDistribucionCampos['Feeder']?.text ?? "",
-              "Nro Closure": _closureDistribucionCampos['Nro Closure']?.text ?? "",
-            };
-            break;
-          case "Secundario":
-            campos = {
-              "Closure padre": _closureSecundarioCampos['Closure padre']?.text ?? "",
-              "Distribucion": _closureSecundarioCampos['Distribucion']?.text ?? "",
-              "Closure secundario": _closureSecundarioCampos['Closure secundario']?.text ?? "",
-            };
-            break;
-          case "Continuidad":
-            campos = {
-              "Nro Closure": _closureContinuidadCampos['Nro Closure']?.text ?? "",
-            };
-            break;
-          case "Reparacion":
-            campos = {
-              "Nro Closure de reparacion": _closureReparacionCampos['Nro Closure de reparacion']?.text ?? "",
-            };
-            break;
-        }
-      }
-
-      // Generar PDF en memoria
-      final pdf = pw.Document();
-      pdf.addPage(
-        pw.Page(
-          build: (pw.Context context) {
-            return pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Text('Reporte de Instalación', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
-                pw.SizedBox(height: 16),
-                pw.Text('Técnico: ${_tecnicoController.text}'),
-                pw.Text('Fecha: ${_fechaActual.toLocal()}'),
-                pw.Text('Ubicación: ${_ubicacionActual != null ? "${_ubicacionActual!.latitude}, ${_ubicacionActual!.longitude}" : "No disponible"}'),
-                pw.Text('Unidad de Negocios: ${_unidadNegocioController.text}'),
-                pw.Text('Elemento: $_elementoSeleccionado'),
-                if (_closureNaturaleza != null) pw.Text('Naturaleza: $_closureNaturaleza'),
-                if (_fdtConClosureSecundario != null) pw.Text('¿Con closure secundario?: $_fdtConClosureSecundario'),
-                pw.SizedBox(height: 8),
-                ...campos.entries.map((e) => pw.Text('${e.key}: ${e.value}')),
-                pw.SizedBox(height: 8),
-                pw.Text('Nomenclatura generada: $_nomenclatura', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-              ],
-            );
-          },
-        ),
+      final pdf = await _generarPDF(incluirFotos: false);
+      await Printing.layoutPdf(
+        onLayout: (format) async => pdf.save(),
+        name: _nomenclatura.isNotEmpty ? '$_nomenclatura.pdf' : 'informe.pdf',
       );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al previsualizar: $e')),
+      );
+    }
 
-      // Usar la función de report_logic para generar RAR
+    setState(() => _generando = false);
+  }
+
+  Future<void> _generarComprimido() async {
+    setState(() => _generando = true);
+
+    try {
       final success = await generateAndCompressReport(
         instalador: _tecnicoController.text,
         fecha: _fechaActual,
@@ -586,34 +681,337 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
         elemento: _elementoSeleccionado,
         closureNaturaleza: _closureNaturaleza,
         fdtConClosureSecundario: _fdtConClosureSecundario,
-        campos: campos,
+        campos: _getCampos(),
         nomenclatura: _nomenclatura,
         fotosPorSeccion: _fotosPorSeccion,
         context: context,
       );
 
       if (success) {
-        // ignore: use_build_context_synchronously
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Resumen de certificación generado exitosamente')),
+          const SnackBar(content: Text('Archivo comprimido generado exitosamente')),
         );
       }
     } catch (e) {
-      // ignore: use_build_context_synchronously
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al generar resumen: $e')),
+        SnackBar(content: Text('Error al generar comprimido: $e')),
       );
     }
 
     setState(() => _generando = false);
   }
 
+  Map<String, String> _getCampos() {
+    Map<String, String> campos = {};
+    if (_elementoSeleccionado == "NAP") {
+      campos = {
+        "FDT padre": _napCampos['FDT padre']?.text ?? "",
+        "Nro Distribución Secundario": _napCampos['Nro Distribución Secundario']?.text ?? "",
+        "Nro de NAP": _napCampos['Nro de NAP']?.text ?? "",
+      };
+    } else if (_elementoSeleccionado == "FDT") {
+      if (_fdtConClosureSecundario == "No") {
+        campos = {
+          "Closure padre": _fdtCamposNo['Closure padre']?.text ?? "",
+          "Distribucion": _fdtCamposNo['Distribucion']?.text ?? "",
+          "Nro FDT": _fdtCamposNo['Nro FDT']?.text ?? "",
+        };
+      } else if (_fdtConClosureSecundario == "Si") {
+        campos = {
+          "Closure Secundario padre": _fdtCamposSi['Closure Secundario padre']?.text ?? "",
+          "Distribucion": _fdtCamposSi['Distribucion']?.text ?? "",
+          "Numero de FDT": _fdtCamposSi['Numero de FDT']?.text ?? "",
+        };
+      }
+    } else if (_elementoSeleccionado == "Closure") {
+      switch (_closureNaturaleza) {
+        case "Distribucion":
+          campos = {
+            "Feeder": _closureDistribucionCampos['Feeder']?.text ?? "",
+            "Nro Closure": _closureDistribucionCampos['Nro Closure']?.text ?? "",
+          };
+          break;
+        case "Secundario":
+          campos = {
+            "Closure padre": _closureSecundarioCampos['Closure padre']?.text ?? "",
+            "Distribucion": _closureSecundarioCampos['Distribucion']?.text ?? "",
+            "Closure secundario": _closureSecundarioCampos['Closure secundario']?.text ?? "",
+          };
+          break;
+        case "Continuidad":
+          campos = {
+            "Nro Closure": _closureContinuidadCampos['Nro Closure']?.text ?? "",
+          };
+          break;
+        case "Reparacion":
+          campos = {
+            "Nro Closure de reparacion": _closureReparacionCampos['Nro Closure de reparacion']?.text ?? "",
+          };
+          break;
+      }
+    }
+    return campos;
+  }
 
+  Future<pw.Document> _generarPDF({bool incluirFotos = true}) async {
+    final pdf = pw.Document();
+    final campos = _getCampos();
+    
+    pdf.addPage(
+      pw.Page(
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text('Reporte de Instalación', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 16),
+              pw.Text('Técnico: ${_tecnicoController.text}'),
+              pw.Text('Fecha: ${_fechaActual.toLocal()}'),
+              pw.Text('Ubicación: ${_ubicacionActual != null ? "${_ubicacionActual!.latitude}, ${_ubicacionActual!.longitude}" : "No disponible"}'),
+              pw.Text('Unidad de Negocios: ${_unidadNegocioController.text}'),
+              pw.Text('Elemento: $_elementoSeleccionado'),
+              if (_closureNaturaleza != null) pw.Text('Naturaleza: $_closureNaturaleza'),
+              if (_fdtConClosureSecundario != null) pw.Text('¿Con closure secundario?: $_fdtConClosureSecundario'),
+              pw.SizedBox(height: 8),
+              ...campos.entries.map((e) => pw.Text('${e.key}: ${e.value}')),
+              pw.SizedBox(height: 8),
+              pw.Text('Nomenclatura: $_nomenclatura', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+              if (_elementoSeleccionado != null) ...[
+                pw.SizedBox(height: 16),
+                pw.Text('Información Técnica $_elementoSeleccionado', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+                pw.Text('Tipo de Instalación: $_tipoInstalacion'),
+                if (_elementoSeleccionado == "NAP") ...[
+                  pw.Text('Distancia NAP a FDT: ${_distanciaNapFdtController.text} mts'),
+                  pw.Text('Distancia FDT a ODF: ${_distanciaFdtOdfController.text} mts'),
+                  pw.Text('Cantidad de empalmes desde ODF: ${_cantidadEmpalmesController.text}'),
+                  pw.Text('Longitud de onda: ${_longitudOnda ?? "No especificada"}nm'),
+                ],
+                if (_elementoSeleccionado != "Closure") ...[
+                  pw.Text('Tipo de Splitter: ${_tipoSplitterController.text}'),
+                  pw.Text('Cantidad de Splitter: ${_cantidadSplitterController.text}'),
+                ],
+                if (_elementoSeleccionado == "Closure" && _closureNaturaleza == "Distribucion" && _distribucionBuffers.isNotEmpty) ...[
+                  pw.Text('Distribución por buffer: ${_distribucionBuffers.join(", ")}'),
+                ],
+                pw.Text('Contiene etiqueta de identificacion: $_contieneEtiquetaIdentificacion'),
+                pw.Text('Armado bajo norma: $_armadoBajoNorma'),
+                pw.Text('Fijación bajo norma: $_fijacionBajoNorma'),
+                pw.Text('Cantidad de cables de salida: ${_cantidadCablesSalidaController.text}'),
+                if (_medicionesGuardadas.isNotEmpty) ...[
+                  pw.SizedBox(height: 8),
+                  pw.Text('Mediciones:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                  ..._medicionesGuardadas.entries.map((entry) => 
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text('Mediciones ${entry.key}:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                        pw.Container(
+                          width: 400,
+                          height: 200,
+                          child: pw.Table(
+                            border: pw.TableBorder.all(),
+                            children: [
+                              for (int row = 0; row < 4; row++)
+                                pw.TableRow(
+                                  children: [
+                                    for (int col = 0; col < 4; col++)
+                                      pw.Container(
+                                        width: 100,
+                                        height: 50,
+                                        padding: const pw.EdgeInsets.all(4),
+                                        child: pw.Text('P${row * 4 + col + 1}: - ${entry.value[row * 4 + col + 1] ?? ""}', style: const pw.TextStyle(fontSize: 8)),
+                                      ),
+                                  ],
+                                ),
+                            ],
+                          ),
+                        ),
+                        pw.SizedBox(height: 8),
+                      ],
+                    )
+                  ),
+                ],
+              ],
+            ],
+          );
+        },
+      ),
+    );
+    
+    if (incluirFotos) {
+      pdf.addPage(
+        pw.Page(
+          build: (pw.Context context) {
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text('Fotos y Archivos Adjuntos', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+                pw.SizedBox(height: 16),
+                ..._fotosPorSeccion.entries.map((entry) => 
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text('${entry.key}:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                      ...entry.value.asMap().entries.map((foto) => 
+                        pw.Text('• ${entry.key.replaceAll(" ", "_")}_${foto.key + 1}.${foto.value.extension}')
+                      ),
+                      pw.SizedBox(height: 8),
+                    ],
+                  )
+                ),
+                if (_archivoOtdr != null) ...[
+                  pw.Text('Trazas OTDR:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                  pw.Text('• ${_archivoOtdr!.name}'),
+                ],
+              ],
+            );
+          },
+        ),
+      );
+    }
+    
+    return pdf;
+  }
+  
+  void _guardarMediciones() {
+    if (_longitudOnda == null) return;
+    
+    String clave = '${_longitudOnda}nm';
+    
+    Map<int, String> mediciones = {};
+    _medicionesPuertos.forEach((puerto, controller) {
+      if (controller.text.isNotEmpty) {
+        mediciones[puerto] = controller.text;
+      }
+    });
+    
+    setState(() {
+      _medicionesGuardadas[clave] = mediciones;
+    });
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Mediciones guardadas para $clave')),
+    );
+  }
+  
+  void _agregarBuffer() {
+    if (_bufferSeleccionado != null && !_distribucionBuffers.contains(_bufferSeleccionado!)) {
+      setState(() {
+        _distribucionBuffers.add(_bufferSeleccionado!);
+        _bufferSeleccionado = null;
+      });
+    }
+  }
+  
+  void _eliminarBuffer(int index) {
+    setState(() {
+      _distribucionBuffers.removeAt(index);
+    });
+  }
 
+  void _guardarDatos() {
+    final dataToSave = {
+      'tecnico': _tecnicoController.text,
+      'unidadNegocio': _unidadNegocioController.text,
+      'feeder': _feederController.text,
+      'closure': _closureController.text,
+      'buffer': _bufferController.text,
+      'hilo': _hiloController.text,
+      'elemento': _elementoSeleccionado,
+      'closureNaturaleza': _closureNaturaleza,
+      'fdtConClosureSecundario': _fdtConClosureSecundario,
+      'nomenclatura': _nomenclatura,
+      'tipoInstalacion': _tipoInstalacion,
+      'contieneEtiquetaIdentificacion': _contieneEtiquetaIdentificacion,
+      'armadoBajoNorma': _armadoBajoNorma,
+      'fijacionBajoNorma': _fijacionBajoNorma,
+      'longitudOnda': _longitudOnda,
+      'datosListos': _datosListos,
+      'distribucionBuffers': List.from(_distribucionBuffers),
+    };
+    
+    _dataManager.savePlanilla2Data(dataToSave);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Datos guardados exitosamente')),
+    );
+  }
+
+  void _limpiarCampos() {
+    setState(() {
+      _tecnicoController.clear();
+      _unidadNegocioController.clear();
+      _feederController.clear();
+      _closureController.clear();
+      _bufferController.clear();
+      _hiloController.clear();
+      _elementoSeleccionado = null;
+      _closureNaturaleza = null;
+      _fdtConClosureSecundario = null;
+      
+      for (var ctrl in _napCampos.values) {
+        ctrl.clear();
+      }
+      for (var ctrl in _fdtCamposNo.values) {
+        ctrl.clear();
+      }
+      for (var ctrl in _fdtCamposSi.values) {
+        ctrl.clear();
+      }
+      for (var ctrl in _closureDistribucionCampos.values) {
+        ctrl.clear();
+      }
+      for (var ctrl in _closureSecundarioCampos.values) {
+        ctrl.clear();
+      }
+      for (var ctrl in _closureContinuidadCampos.values) {
+        ctrl.clear();
+      }
+      for (var ctrl in _closureReparacionCampos.values) {
+        ctrl.clear();
+      }
+      
+      _tipoInstalacion = 'Aerea';
+      _distanciaNapFdtController.clear();
+      _distanciaFdtOdfController.clear();
+      _cantidadEmpalmesController.clear();
+      _tipoSplitterController.clear();
+      _cantidadSplitterController.clear();
+      _contieneEtiquetaIdentificacion = 'Si';
+      _armadoBajoNorma = 'Si';
+      _fijacionBajoNorma = 'Si';
+      _cantidadCablesSalidaController.clear();
+      _medicionesGuardadas.clear();
+      _datosListos = false;
+      for (var controller in _medicionesPuertos.values) {
+        controller.clear();
+      }
+      _longitudOnda = null;
+      _medicionesPuertos.clear();
+      _archivoOtdr = null;
+      _fotosPorSeccion.clear();
+      _seccionesExpand.clear();
+      _nomenclatura = "";
+      _distribucionBuffers.clear();
+      _bufferSeleccionado = null;
+    });
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Campos limpiados')),
+    );
+  }
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Generar reporte formato NAP Register")),
+      appBar: AppBar(
+        title: const Text("Generar reporte certificacion"),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.save),
+            onPressed: _guardarDatos,
+            tooltip: 'Guardar datos',
+          ),
+        ],
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -635,6 +1033,24 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
               decoration: const InputDecoration(labelText: "Unidad de Negocios"),
               maxLines: null,
               keyboardType: TextInputType.multiline,
+            ),
+            TextField(
+              controller: _feederController,
+              decoration: const InputDecoration(labelText: "Feeder"),
+            ),
+            TextField(
+              controller: _closureController,
+              decoration: const InputDecoration(labelText: "Closure"),
+            ),
+            DropdownButtonFormField<String>(
+              items: ['-', 'Azul', 'Naranja', 'Verde', 'Marron', 'Gris', 'Blanco', 'Rojo', 'Negro', 'Amarillo', 'Violeta', 'Rosa', 'Aqua'].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+              onChanged: (v) => _bufferController.text = v ?? '',
+              decoration: const InputDecoration(labelText: "Buffer"),
+            ),
+            DropdownButtonFormField<String>(
+              items: ['-', 'Azul', 'Naranja', 'Verde', 'Marron', 'Gris', 'Blanco', 'Rojo', 'Negro', 'Amarillo', 'Violeta', 'Rosa', 'Aqua'].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+              onChanged: (v) => _hiloController.text = v ?? '',
+              decoration: const InputDecoration(labelText: "Hilo"),
             ),
             const SizedBox(height: 16),
 
@@ -670,20 +1086,30 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
                   for (var ctrl in _closureReparacionCampos.values) {
                     ctrl.clear();
                   }
-                  // Limpiar campos NAP específicos
-                  _tipoInstalacionController.clear();
+                  // Limpiar campos técnicos
+                  _tipoInstalacion = 'Aerea';
                   _distanciaNapFdtController.clear();
                   _distanciaFdtOdfController.clear();
                   _cantidadEmpalmesController.clear();
-                  _referenciaOltController.clear();
+                  _tipoSplitterController.clear();
+                  _cantidadSplitterController.clear();
+                  _contieneEtiquetaIdentificacion = 'Si';
+                  _armadoBajoNorma = 'Si';
+                  _fijacionBajoNorma = 'Si';
+                  _cantidadCablesSalidaController.clear();
+                  _medicionesGuardadas.clear();
+                  _datosListos = false;
+                  for (var controller in _medicionesPuertos.values) {
+                    controller.clear();
+                  }
                   _longitudOnda = null;
-                  _tipoSplitter = null;
-                  _splitterSeleccionado = null;
                   _medicionesPuertos.clear();
                   _archivoOtdr = null;
                   _fotosPorSeccion.clear();
                   _seccionesExpand.clear();
                   _nomenclatura = "";
+                  _distribucionBuffers.clear();
+                  _bufferSeleccionado = null;
                 });
               },
               decoration: const InputDecoration(labelText: "Elemento"),
@@ -700,16 +1126,39 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
 
             const SizedBox(height: 16),
 
-
-
             // Sección de fotos/adjuntos
             _buildFotosSeccion(),
 
             const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.check),
+                  label: const Text("Datos Listos"),
+                  onPressed: () => setState(() => _datosListos = true),
+                ),
+                ElevatedButton.icon(
+                  icon: _generando ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.preview),
+                  label: const Text("Previsualizar Informe"),
+                  onPressed: _generando ? null : _previsualizarInforme,
+                ),
+                ElevatedButton.icon(
+                  icon: _generando ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.archive),
+                  label: const Text("Generar Comprimido"),
+                  onPressed: (_generando || !_datosListos) ? null : _generarComprimido,
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
             ElevatedButton.icon(
-              icon: _generando ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.archive),
-              label: const Text("GENERAR RESUMEN DE CERTIFICACIÓN"),
-              onPressed: _generando ? null : _generarResumenCertificacion,
+              icon: const Icon(Icons.clear_all),
+              label: const Text("Limpiar Campos"),
+              onPressed: _limpiarCampos,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red[100],
+                foregroundColor: Colors.red[800],
+              ),
             ),
           ],
         ),

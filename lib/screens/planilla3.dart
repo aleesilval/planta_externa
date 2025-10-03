@@ -6,6 +6,7 @@ import 'package:file_picker/file_picker.dart';
 // ignore: unused_import
 import 'dart:typed_data';
 import 'package:flutter/services.dart';
+import '../data/form_data_manager.dart';
 
 class Planilla3Page extends StatefulWidget {
   const Planilla3Page({super.key});
@@ -47,6 +48,8 @@ class _Planilla3PageState extends State<Planilla3Page> {
   String? _descripcionSeleccionada;
   
   // Tabla de artículos predefinida
+  final FormDataManager _dataManager = FormDataManager();
+  
   static const Map<String, String> _tablaArticulos = {
     '1001001': 'POSTE C.METAL 2 SECCIONES / 4 1/2" - 3 1/2" / 7 M',
     '1001005': 'POSTE 3 SECCIONES 5 1/2" 4 1/2" 3 1/2" 9 MTS',
@@ -84,6 +87,51 @@ class _Planilla3PageState extends State<Planilla3Page> {
   void initState() {
     super.initState();
     _obtenerUbicacion();
+    _loadSavedData();
+  }
+  
+  void _loadSavedData() {
+    final savedData = _dataManager.getPlanilla3Data();
+    if (savedData.isNotEmpty) {
+      setState(() {
+        _tecnicoController.text = savedData['tecnico'] ?? '';
+        _unidadNegocioController.text = savedData['unidadNegocio'] ?? '';
+        _nomenclaturaController.text = savedData['nomenclatura'] ?? '';
+        _tiempoAtencionController.text = savedData['tiempoAtencion'] ?? '';
+        _afectacionController.text = savedData['afectacion'] ?? '';
+        _direccionCortaController.text = savedData['direccionCorta'] ?? '';
+        _accionesRealizadasController.text = savedData['accionesRealizadas'] ?? '';
+        _conclusionesController.text = savedData['conclusiones'] ?? '';
+        if (savedData['soluciones'] != null) {
+          _soluciones.clear();
+          _soluciones.addAll(List<String>.from(savedData['soluciones']));
+        }
+        if (savedData['materiales'] != null) {
+          _materiales.clear();
+          _materiales.addAll(List<Map<String, String>>.from(savedData['materiales']));
+        }
+      });
+    }
+  }
+  
+  void _guardarDatos() {
+    final dataToSave = {
+      'tecnico': _tecnicoController.text,
+      'unidadNegocio': _unidadNegocioController.text,
+      'nomenclatura': _nomenclaturaController.text,
+      'tiempoAtencion': _tiempoAtencionController.text,
+      'afectacion': _afectacionController.text,
+      'direccionCorta': _direccionCortaController.text,
+      'accionesRealizadas': _accionesRealizadasController.text,
+      'conclusiones': _conclusionesController.text,
+      'soluciones': List.from(_soluciones),
+      'materiales': List.from(_materiales),
+    };
+    
+    _dataManager.savePlanilla3Data(dataToSave);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Datos guardados exitosamente')),
+    );
   }
   
   void _onCodigoChanged() {
@@ -327,7 +375,16 @@ class _Planilla3PageState extends State<Planilla3Page> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Generar informe de mantenimiento correctivo')),
+      appBar: AppBar(
+        title: const Text('Generar informe de mantenimiento correctivo'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.save),
+            onPressed: _guardarDatos,
+            tooltip: 'Guardar datos',
+          ),
+        ],
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -460,6 +517,7 @@ class _Planilla3PageState extends State<Planilla3Page> {
             Row(
               children: [
                 Expanded(
+                  flex: 1,
                   child: TextField(
                     controller: _codigoController,
                     enabled: _descripcionSeleccionada == "Otro",
@@ -471,6 +529,7 @@ class _Planilla3PageState extends State<Planilla3Page> {
                 ),
                 const SizedBox(width: 8),
                 Expanded(
+                  flex: 2,
                   child: _descripcionSeleccionada == "Otro" 
                     ? TextField(
                         controller: _materialController,
@@ -485,14 +544,33 @@ class _Planilla3PageState extends State<Planilla3Page> {
                           ..._tablaArticulos.values.map((descripcion) => 
                             DropdownMenuItem(
                               value: descripcion, 
-                              child: Text(
-                                descripcion.length > 30 ? '${descripcion.substring(0, 30)}...' : descripcion,
-                                overflow: TextOverflow.ellipsis
+                              child: Container(
+                                width: double.infinity,
+                                child: Text(
+                                  descripcion,
+                                  style: const TextStyle(fontSize: 12),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               )
                             )
                           ),
-                          const DropdownMenuItem(value: "Otro", child: Text("Otro")),
+                          const DropdownMenuItem(
+                            value: "Otro", 
+                            child: Text("Otro", style: TextStyle(fontSize: 12))
+                          ),
                         ],
+                        selectedItemBuilder: (BuildContext context) {
+                          return [
+                            ..._tablaArticulos.values.map((descripcion) => 
+                              Text(
+                                descripcion.length > 25 ? '${descripcion.substring(0, 25)}...' : descripcion,
+                                overflow: TextOverflow.ellipsis
+                              )
+                            ),
+                            const Text("Otro"),
+                          ];
+                        },
                         onChanged: (descripcion) {
                           setState(() {
                             _descripcionSeleccionada = descripcion;
@@ -512,13 +590,21 @@ class _Planilla3PageState extends State<Planilla3Page> {
                 ),
                 const SizedBox(width: 8),
                 Expanded(
+                  flex: 1,
                   child: DropdownButtonFormField<String>(
-                    initialValue: _unidadSeleccionada,
+                    value: _unidadSeleccionada,
                     items: const [
                       DropdownMenuItem(value: "mts", child: Text("metros")),
                       DropdownMenuItem(value: "cms", child: Text("centimetros")),
                       DropdownMenuItem(value: "un", child: Text("unidades")),
                     ],
+                    selectedItemBuilder: (BuildContext context) {
+                      return const [
+                        Text("mts", overflow: TextOverflow.ellipsis),
+                        Text("cms", overflow: TextOverflow.ellipsis),
+                        Text("un", overflow: TextOverflow.ellipsis),
+                      ];
+                    },
                     onChanged: (v) => setState(() => _unidadSeleccionada = v),
                     decoration: const InputDecoration(
                       labelText: "Unidades",
@@ -528,6 +614,7 @@ class _Planilla3PageState extends State<Planilla3Page> {
                 ),
                 const SizedBox(width: 8),
                 Expanded(
+                  flex: 1,
                   child: TextField(
                     controller: _cantidadController,
                     decoration: const InputDecoration(
