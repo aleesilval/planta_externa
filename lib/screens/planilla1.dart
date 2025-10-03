@@ -1,4 +1,6 @@
 // Importaciones necesarias para el formulario de auditoría
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:flutter/material.dart';
 import 'package:pdf/widgets.dart' as pw; // Para generar PDFs
 import 'package:pdf/pdf.dart';
@@ -7,6 +9,7 @@ import 'package:planta_externa/geo_field.dart'; // Widget personalizado para geo
 import 'dart:io';
 import 'dart:convert'; // Para JSON
 import 'package:path_provider/path_provider.dart'; // Para acceso al sistema de archivos
+import 'package:file_picker/file_picker.dart'; // Para selección de archivos
 
 /// Widget wrapper que contiene el formulario principal
 class FormularioPage extends StatelessWidget {
@@ -73,6 +76,8 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
 
   // Encabezado y controladores
   final TextEditingController _unidadNegocioController = TextEditingController();
+  final TextEditingController _feederController = TextEditingController();
+  final TextEditingController _bufferController = TextEditingController();
   String _tipoCable = 'Cable alimentador';
   String _hilos = 'Azul';
   final TextEditingController _fdtPadreController = TextEditingController();
@@ -96,10 +101,11 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
   String _morseteriaIdentificada = 'Bajo Norma';
   String _tipoElemento = 'CL';
   String _modeloElementoFijado = '288H';
-  String _elementoFijacion = 'Tirraje';
+  String _elementoFijacion = '1 fleje';
   final TextEditingController _cantidadElementoController = TextEditingController();
   final TextEditingController _geolocalizacionElementoController = TextEditingController();
   final TextEditingController _yk01Controller = TextEditingController();
+  final TextEditingController _nomenclaturaElementoController = TextEditingController();
 
   // Geolocalización + dropdowns para tendido actual/acción
   String _tendidoActual = 'Bajo norma';
@@ -113,6 +119,11 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
   final TextEditingController _zonasPodaFinController = TextEditingController();
   final TextEditingController _observacionesController = TextEditingController();
   final TextEditingController _trabajosPendientesController = TextEditingController();
+  
+  // Evidencia fotográfica
+  final TextEditingController _descripcionEvidenciaController = TextEditingController();
+  final List<PlatformFile> _fotosEvidencia = [];
+  final List<Map<String, dynamic>> _evidenciaFotografica = [];
 
   // Mediciones (4 Hilos) - 16 puertos, doble tabla para 1550nm y 1490nm
   final List<TextEditingController> _medicionesPuertos1550 = List.generate(16, (i) => TextEditingController());
@@ -136,7 +147,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
     ],
   };
   final List<String> _opcionesMorseteria = ['Bajo Norma', 'Fuera de Norma'];
-  final List<String> _opcionesElementoFijacion = ['Tirraje', '1 Fleje', '2 Fleje', 'Otro'];
+  final List<String> _opcionesElementoFijacion = ['1 fleje','2 fleje','1 tirraje','2 tirraje','otro'];
   final List<String> _opcionesMateriales = [
     ' - ',
     'Adición de fleje faltante',
@@ -168,7 +179,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
   String get labelSoporteSuspension => _tipoCable == '4 Hilos' ? 'Nomenclatura del NAP' : 'Soporte de Suspensión';
   List<String> get opcionesTipoElemento {
     if (_tipoCable == '4 Hilos') return ['NAP', '-'];
-    if (_tipoCable == 'Cable de distribución') return ['FDT','FDT Secundario','-'];
+    if (_tipoCable == 'Cable de distribución') return ['FDT', '-'];
     if (_tipoCable == 'Cable alimentador') return ['CL', '-'];
     return ['CL', 'FDT'];
   }
@@ -184,6 +195,8 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
   void _limpiarTodo() {
     setState(() {
       _unidadNegocioController.clear();
+      _feederController.clear();
+      _bufferController.clear();
       _tipoCable = 'Cable alimentador';
       _hilos = _opcionesHilos[_tipoCable]![0];
       _fdtPadreController.clear();
@@ -197,7 +210,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
       _morseteriaIdentificada = 'Bajo Norma';
       _tipoElemento = opcionesTipoElemento[0];
       _modeloElementoFijado = _opcionesModeloElemento[_tipoElemento]![0];
-      _elementoFijacion = 'Tirraje';
+      _elementoFijacion = '1 fleje';
       _cantidadElementoController.clear();
       _geolocalizacionElementoController.clear();
       _tendidoActual = _opcionesTendidoActual[0];
@@ -213,6 +226,9 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
       _bloquearCabecera = false;
       _editNro = null;
       _yk01Controller.clear();
+      _descripcionEvidenciaController.clear();
+      _fotosEvidencia.clear();
+      _evidenciaFotografica.clear();
       for (final c in _medicionesPuertos1550) { c.clear(); }
       for (final c in _medicionesPuertos1490) { c.clear(); }
     });
@@ -232,7 +248,16 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
           }
           _editNro = null;
         } else {
-          _tabla.add(_filaActual(_contador));
+          final fila = _filaActual(_contador);
+          _tabla.add(fila);
+          // Guardar evidencia fotográfica para este poste
+          if (_fotosEvidencia.isNotEmpty) {
+            _evidenciaFotografica.add({
+              'nroPoste': _contador,
+              'fotos': List<PlatformFile>.from(_fotosEvidencia),
+              'descripcion': _descripcionEvidenciaController.text.isNotEmpty ? _descripcionEvidenciaController.text : 'Sin evidencia',
+            });
+          }
           _contador++;
           if (_tabla.length == 1) _bloquearCabecera = true;
         }
@@ -253,6 +278,10 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
         _posteInter = 'Sí';
         _posteInspeccionado = 'No';
         _yk01Controller.clear();
+        _nomenclaturaElementoController.clear();
+        _descripcionEvidenciaController.clear();
+        _fotosEvidencia.clear();
+        _nomenclaturaElementoController.clear();
         for (final c in _medicionesPuertos1550) { c.clear(); }
         for (final c in _medicionesPuertos1490) { c.clear(); }
       });
@@ -266,10 +295,13 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
   Map<String, dynamic> _filaActual(int nro) => {
     'contador': nro,
     'unidadNegocio': _unidadNegocioController.text,
+    'feeder': _feederController.text,
+    'buffer': _bufferController.text,
     'tipoCable': _tipoCable,
     'hilos': _hilos,
     'fdtPadre': _fdtPadreController.text,
     'yk01': _yk01Controller.text,
+    'nomenclaturaElemento': _nomenclaturaElementoController.text,
     'observacionesDiseno': _observacionesDiseno,
     'posteInter': _posteInter,
     'accionPosteInter': _posteInter == 'Sí' ? _accionPosteInterController.text : ' - ',
@@ -291,6 +323,8 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
     'zonasPodaFin': _zonasPodaFinController.text,
     'observaciones': _observacionesController.text,
     'trabajosPendientes': _trabajosPendientesController.text,
+    'tieneEvidencia': _fotosEvidencia.isNotEmpty,
+    'descripcionEvidencia': _descripcionEvidenciaController.text.isNotEmpty ? _descripcionEvidenciaController.text : 'Sin evidencia',
     'medicionesPuertos1550': _tipoCable == '4 Hilos' ? _medicionesPuertos1550.map((c) => c.text).toList() : null,
     'medicionesPuertos1490': _tipoCable == '4 Hilos' ? _medicionesPuertos1490.map((c) => c.text).toList() : null,
   };
@@ -301,6 +335,8 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
       setState(() {
         _editNro = nro;
         _unidadNegocioController.text = fila['unidadNegocio'];
+        _feederController.text = fila['feeder'] ?? '';
+        _bufferController.text = fila['buffer'] ?? '';
         _tipoCable = fila['tipoCable'];
         _hilos = fila['hilos'];
         _fdtPadreController.text = fila['fdtPadre'] ?? '';
@@ -326,6 +362,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
         _observacionesController.text = fila['observaciones'];
         _trabajosPendientesController.text = fila['trabajosPendientes'];
         _yk01Controller.text = fila['yk01'] ?? '';
+        _nomenclaturaElementoController.text = fila['nomenclaturaElemento'] ?? '';
         if (_tipoCable == '4 Hilos') {
           final l1550 = List<String>.from(fila['medicionesPuertos1550'] ?? []);
           final l1490 = List<String>.from(fila['medicionesPuertos1490'] ?? []);
@@ -348,6 +385,19 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
       const SnackBar(content: Text('Progreso guardado localmente')),
     );
   }
+  
+  Future<void> _pickPhotos() async {
+    FilePickerResult? result = await FilePicker.platform.pickFiles(
+      allowMultiple: false,
+      type: FileType.image,
+    );
+    if (result != null) {
+      setState(() {
+        _fotosEvidencia.clear();
+        _fotosEvidencia.add(result.files.single);
+      });
+    }
+  }
 
   Future<void> _exportarPDF() async {
     final pdf = pw.Document();
@@ -366,7 +416,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
               pw.Text('Auditoría de Mantenimiento', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
               pw.SizedBox(height: 8),
               pw.Text(
-                '${_unidadNegocioController.text}${_tipoCable == "4 Hilos" ? '   FDT padre: ${_fdtPadreController.text}' : ''}   Tipo de cable: $_tipoCable',
+                'Unidad de negocio: ${_unidadNegocioController.text}, Feeder: ${_feederController.text}${(_tipoCable == 'Cable de distribución' || _tipoCable == '4 Hilos') && _bufferController.text.isNotEmpty ? ', Buffer: ${_bufferController.text}' : ''}${_tipoCable == "4 Hilos" ? '   FDT padre: ${_fdtPadreController.text}' : ''}   Tipo de cable: $_tipoCable',
                 style: pw.TextStyle(fontSize: 12),
               ),
               pw.Divider(),
@@ -388,12 +438,13 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                       pw.Text('Tipo de Elemento', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6)),
                       pw.Text('Modelo', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6)),
                       pw.Text('Elemento de fijación', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6)),
-                      pw.Text('Cantidad', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6)),
+                      pw.Text('Descripción de fijación', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6)),
                       pw.Text('Geolocalización', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6)),
                       pw.Text('Tendido Actual', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6)),
                       pw.Text('Tendido Acción', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6)),
                       pw.Text('Reservas Actual', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6)),
                       pw.Text('Reservas Acción', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6)),
+                      pw.Text('Evidencia', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6)),
                       if (_tipoCable == '4 Hilos') pw.Text('Mediciones 1550nm', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6)),
                       if (_tipoCable == '4 Hilos') pw.Text('Mediciones 1490nm', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6)),
                       pw.Text('Observaciones', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6)),
@@ -419,6 +470,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                       pw.Text(fila['tendidoAccion'] ?? '', style: const pw.TextStyle(fontSize: 6)),
                       pw.Text(fila['reservasActual'] ?? '', style: const pw.TextStyle(fontSize: 6)),
                       pw.Text(fila['reservasAccion'] ?? '', style: const pw.TextStyle(fontSize: 6)),
+                      pw.Text(fila['tieneEvidencia'] == true ? 'X' : '', style: const pw.TextStyle(fontSize: 8)),
                       if (_tipoCable == '4 Hilos')
                         pw.Container(
                           width: 150,
@@ -464,6 +516,53 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
         },
       ),
     );
+    
+    // Página de evidencia fotográfica
+    if (_evidenciaFotografica.isNotEmpty) {
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.letter,
+          margin: const pw.EdgeInsets.all(12),
+          build: (context) {
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text('Evidencia Fotográfica', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+                pw.SizedBox(height: 16),
+                ..._evidenciaFotografica.map((evidencia) {
+                  final nroPoste = evidencia['nroPoste'] as int;
+                  final fotos = evidencia['fotos'] as List<PlatformFile>;
+                  final descripcion = evidencia['descripcion'] as String;
+                  
+                  return pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      if (fotos.isNotEmpty && fotos.first.bytes != null)
+                        pw.Container(
+                          height: 200,
+                          width: double.infinity,
+                          child: pw.Image(pw.MemoryImage(fotos.first.bytes!)),
+                        ),
+                      pw.SizedBox(height: 8),
+                      pw.Text('${_unidadNegocioController.text} ${_feederController.text} ${(_tipoCable == 'Cable de distribución' || _tipoCable == '4 Hilos') && _bufferController.text.isNotEmpty ? '${_bufferController.text} ' : ''}${_geolocalizacionElementoController.text} $descripcion', style: pw.TextStyle(fontSize: 10)),
+                      pw.SizedBox(height: 16),
+                    ],
+                  );
+                }).toList(),
+                // Agregar postes sin evidencia
+                ..._tabla.where((fila) => !_evidenciaFotografica.any((ev) => ev['nroPoste'] == fila['contador'])).map((fila) => 
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.only(bottom: 8),
+                    child: pw.Text('${_unidadNegocioController.text} ${_feederController.text} ${(_tipoCable == 'Cable de distribución' || _tipoCable == '4 Hilos') && _bufferController.text.isNotEmpty ? '${_bufferController.text} ' : ''}${_geolocalizacionElementoController.text} Sin evidencia', style: pw.TextStyle(fontSize: 10)),
+                  )
+                ),
+              ],
+            );
+          },
+        ),
+      );
+    }
+    
     await Printing.layoutPdf(
       onLayout: (PdfPageFormat format) async => pdf.save(),
     );
@@ -473,9 +572,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
   Widget build(BuildContext context) {
     final hilosOptions = _opcionesHilos[_tipoCable]!;
     if (!hilosOptions.contains(_hilos)) _hilos = hilosOptions[0];
-    final tipoElementoOptions = _tipoCable == '4 Hilos'
-        ? ['NAP', '-']
-        : ['CL', 'FDT'];
+    final tipoElementoOptions = opcionesTipoElemento;
     if (!tipoElementoOptions.contains(_tipoElemento)) _tipoElemento = tipoElementoOptions[0];
     final modeloOptions = _opcionesModeloElemento[_tipoElemento]!;
     if (!modeloOptions.contains(_modeloElementoFijado)) _modeloElementoFijado = modeloOptions[0];
@@ -508,6 +605,9 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                 child: ListView(
                   children: [
                     _buildTextField('Unidad de Negocio', _unidadNegocioController, enabled: !_bloquearCabecera),
+                    _buildTextField('Feeder', _feederController, enabled: !_bloquearCabecera),
+                    if (_tipoCable == 'Cable de distribución' || _tipoCable == '4 Hilos')
+                      _buildTextField('Buffer', _bufferController, enabled: !_bloquearCabecera),
                     if (_tipoCable == '4 Hilos')
                       _buildTextField('FDT padre', _fdtPadreController, enabled: !_bloquearCabecera),
                     _buildDropdownField('Tipo de cable', _tipoCable, _opcionesTipoCable, (val) {
@@ -545,10 +645,14 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                     _buildDropdownField('Modelo de elemento fijado', _modeloElementoFijado, modeloOptions, (val) {
                       setState(() { _modeloElementoFijado = val!; });
                     }),
+                    if (_tipoElemento == 'CL')
+                      _buildTextField('Nomenclatura CL', _nomenclaturaElementoController),
+                    if (_tipoElemento == 'FDT')
+                      _buildTextField('Nomenclatura FDT', _nomenclaturaElementoController),
                     _buildDropdownField('Elemento de fijación', _elementoFijacion, _opcionesElementoFijacion, (val) {
                       setState(() { _elementoFijacion = val!; });
                     }),
-                    _buildTextField('Cantidad', _cantidadElementoController),
+                    _buildTextField('Descripción de fijación', _cantidadElementoController, enabled: _elementoFijacion == 'otro'),
                     // Tendido con perdida de tensión geolocalización actual/acción
                     _buildDropdownField('Tendido con perdida de tensión geolocalización actual', _tendidoActual, _opcionesTendidoActual, (val) { setState(() { _tendidoActual = val!; }); }),
                     _buildDropdownField('Tendido con perdida de tensión geolocalización acción', _tendidoAccion, _opcionesTendidoAccion, (val) { setState(() { _tendidoAccion = val!; }); }),
@@ -560,12 +664,9 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                     }),
                     GeoField(
                       controller: _zonasPodaInicioController,
-                      label: 'Geolocalización de zona poda inicio',
+                      label: 'Geolocalización de zona de poda o desmalezado',
                     ),
-                    GeoField(
-                      controller: _zonasPodaFinController,
-                      label: 'Geolocalización de zona poda fin',
-                    ),
+                    _buildTextField('Descripción de zona de poda o desmalezado', _zonasPodaFinController),
                     if (_tipoCable == '4 Hilos')
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -628,6 +729,26 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                       ),
                     _buildTextField('Observaciones', _observacionesController),
                     _buildTextField('Trabajos pendientes', _trabajosPendientesController),
+                    const SizedBox(height: 16),
+                    const Text("Evidencia Fotográfica", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    _buildTextField('Descripción de evidencia fotográfica', _descripcionEvidenciaController),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.photo_camera),
+                          label: Text('Adjuntar Fotos (${_fotosEvidencia.length})'),
+                          onPressed: _pickPhotos,
+                        ),
+                        const SizedBox(width: 8),
+                        if (_fotosEvidencia.isNotEmpty)
+                          ElevatedButton.icon(
+                            icon: const Icon(Icons.clear),
+                            label: const Text('Limpiar'),
+                            onPressed: () => setState(() => _fotosEvidencia.clear()),
+                          ),
+                      ],
+                    ),
                     const SizedBox(height: 12),
                     SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
@@ -721,12 +842,13 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                             const DataColumn(label: Text('Tipo de Elemento')),
                             const DataColumn(label: Text('Modelo')),
                             const DataColumn(label: Text('Elemento de fijación')),
-                            const DataColumn(label: Text('Cantidad')),
+                            const DataColumn(label: Text('Descripción de fijación')),
                             const DataColumn(label: Text('Geolocalización')),
                             const DataColumn(label: Text('Tendido Actual')),
                             const DataColumn(label: Text('Tendido Acción')),
                             const DataColumn(label: Text('Reservas Actual')),
                             const DataColumn(label: Text('Reservas Acción')),
+                            const DataColumn(label: Text('Evidencia')),
                             if (_tipoCable == '4 Hilos') const DataColumn(label: Text('Mediciones 1550nm')),
                             if (_tipoCable == '4 Hilos') const DataColumn(label: Text('Mediciones 1490nm')),
                             const DataColumn(label: Text('Observaciones')),
@@ -752,6 +874,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                                 DataCell(Text(fila['tendidoAccion'] ?? '')),
                                 DataCell(Text(fila['reservasActual'] ?? '')),
                                 DataCell(Text(fila['reservasAccion'] ?? '')),
+                                DataCell(Text(fila['tieneEvidencia'] == true ? 'X' : '')),
                                 if (_tipoCable == '4 Hilos')
                                   DataCell(
                                     Table(

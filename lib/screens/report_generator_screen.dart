@@ -613,7 +613,7 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Generar Reporte")),
+      appBar: AppBar(title: const Text("Generar reporte formato NAP Register")),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(

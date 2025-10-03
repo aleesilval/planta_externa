@@ -327,7 +327,7 @@ class _Planilla3PageState extends State<Planilla3Page> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Información del Reporte')),
+      appBar: AppBar(title: const Text('Generar informe de mantenimiento correctivo')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
