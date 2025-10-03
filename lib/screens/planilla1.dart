@@ -8,6 +8,7 @@ import 'package:printing/printing.dart'; // Para imprimir/exportar PDFs
 import 'package:planta_externa/geo_field.dart'; // Widget personalizado para geolocalización
 import 'dart:io';
 import 'dart:convert'; // Para JSON
+import 'dart:typed_data';
 import 'package:path_provider/path_provider.dart'; // Para acceso al sistema de archivos
 import 'package:file_picker/file_picker.dart'; // Para selección de archivos
 import '../data/form_data_manager.dart';
@@ -150,6 +151,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
   final TextEditingController _descripcionEvidenciaController = TextEditingController();
   final List<PlatformFile> _fotosEvidencia = [];
   final List<Map<String, dynamic>> _evidenciaFotografica = [];
+  PlatformFile? _fotoSeleccionada;
 
   // Mediciones (4 Hilos) - 16 puertos, doble tabla para 1550nm y 1490nm
   final List<TextEditingController> _medicionesPuertos1550 = List.generate(16, (i) => TextEditingController());
@@ -257,6 +259,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
       _descripcionEvidenciaController.clear();
       _fotosEvidencia.clear();
       _evidenciaFotografica.clear();
+      _fotoSeleccionada = null;
       for (final c in _medicionesPuertos1550) { c.clear(); }
       for (final c in _medicionesPuertos1490) { c.clear(); }
     });
@@ -278,14 +281,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
         } else {
           final fila = _filaActual(_contador);
           _tabla.add(fila);
-          // Guardar evidencia fotográfica para este poste
-          if (_fotosEvidencia.isNotEmpty) {
-            _evidenciaFotografica.add({
-              'nroPoste': _contador,
-              'fotos': List<PlatformFile>.from(_fotosEvidencia),
-              'descripcion': _descripcionEvidenciaController.text.isNotEmpty ? _descripcionEvidenciaController.text : 'Sin evidencia',
-            });
-          }
+
           _contador++;
           if (_tabla.length == 1) _bloquearCabecera = true;
         }
@@ -307,8 +303,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
         _posteInspeccionado = 'No';
         _yk01Controller.clear();
         _nomenclaturaElementoController.clear();
-        _descripcionEvidenciaController.clear();
-        _fotosEvidencia.clear();
+        _fotoSeleccionada = null;
         _nomenclaturaElementoController.clear();
         for (final c in _medicionesPuertos1550) { c.clear(); }
         for (final c in _medicionesPuertos1490) { c.clear(); }
@@ -351,8 +346,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
     'zonasPodaFin': _zonasPodaFinController.text,
     'observaciones': _observacionesController.text,
     'trabajosPendientes': _trabajosPendientesController.text,
-    'tieneEvidencia': _fotosEvidencia.isNotEmpty,
-    'descripcionEvidencia': _descripcionEvidenciaController.text.isNotEmpty ? _descripcionEvidenciaController.text : 'Sin evidencia',
+
     'medicionesPuertos1550': _tipoCable == '4 Hilos' ? _medicionesPuertos1550.map((c) => c.text).toList() : null,
     'medicionesPuertos1490': _tipoCable == '4 Hilos' ? _medicionesPuertos1490.map((c) => c.text).toList() : null,
   };
@@ -431,16 +425,43 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
     );
   }
   
-  Future<void> _pickPhotos() async {
+  Future<void> _selectPhoto() async {
     FilePickerResult? result = await FilePicker.platform.pickFiles(
       allowMultiple: false,
       type: FileType.image,
     );
     if (result != null) {
       setState(() {
-        _fotosEvidencia.clear();
-        _fotosEvidencia.add(result.files.single);
+        _fotoSeleccionada = result.files.single;
       });
+    }
+  }
+
+  Future<void> _loadPhoto() async {
+    if (_fotoSeleccionada != null && _descripcionEvidenciaController.text.isNotEmpty) {
+      Uint8List? bytes = _fotoSeleccionada!.bytes;
+      // Load bytes from path if not available
+      if (bytes == null && _fotoSeleccionada!.path != null) {
+        bytes = await File(_fotoSeleccionada!.path!).readAsBytes();
+      }
+      setState(() {
+        _evidenciaFotografica.add({
+          'foto': _fotoSeleccionada!,
+          'bytes': bytes,
+          'descripcion': _descripcionEvidenciaController.text,
+          'nroPoste': _contador,
+          'geolocalizacion': _geolocalizacionElementoController.text,
+        });
+        _fotoSeleccionada = null;
+        _descripcionEvidenciaController.clear();
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Foto agregada para poste $_contador')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Seleccione una foto y agregue una descripción')),
+      );
     }
   }
 
@@ -489,7 +510,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                       pw.Text('Tendido Acción', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6)),
                       pw.Text('Reservas Actual', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6)),
                       pw.Text('Reservas Acción', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6)),
-                      pw.Text('Evidencia', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6)),
+
                       if (_tipoCable == '4 Hilos') pw.Text('Mediciones 1550nm', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6)),
                       if (_tipoCable == '4 Hilos') pw.Text('Mediciones 1490nm', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6)),
                       pw.Text('Observaciones', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6)),
@@ -515,7 +536,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                       pw.Text(fila['tendidoAccion'] ?? '', style: const pw.TextStyle(fontSize: 6)),
                       pw.Text(fila['reservasActual'] ?? '', style: const pw.TextStyle(fontSize: 6)),
                       pw.Text(fila['reservasAccion'] ?? '', style: const pw.TextStyle(fontSize: 6)),
-                      pw.Text(fila['tieneEvidencia'] == true ? 'X' : '', style: const pw.TextStyle(fontSize: 8)),
+
                       if (_tipoCable == '4 Hilos')
                         pw.Container(
                           width: 150,
@@ -575,21 +596,30 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                 pw.Text('Evidencia Fotográfica', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
                 pw.SizedBox(height: 16),
                 ..._evidenciaFotografica.map((evidencia) {
-                  final nroPoste = evidencia['nroPoste'] as int;
-                  final fotos = evidencia['fotos'] as List<PlatformFile>;
+                  final foto = evidencia['foto'] as PlatformFile;
+                  final bytes = evidencia['bytes'] as Uint8List?;
                   final descripcion = evidencia['descripcion'] as String;
+                  final nroPoste = evidencia['nroPoste'] as int? ?? 0;
+                  final geolocalizacion = evidencia['geolocalizacion'] as String? ?? '';
                   
                   return pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
-                      if (fotos.isNotEmpty && fotos.first.bytes != null)
+                      if (bytes != null)
                         pw.Container(
                           height: 200,
                           width: double.infinity,
-                          child: pw.Image(pw.MemoryImage(fotos.first.bytes!)),
+                          child: pw.Image(pw.MemoryImage(bytes)),
+                        )
+                      else
+                        pw.Container(
+                          height: 200,
+                          width: double.infinity,
+                          decoration: pw.BoxDecoration(border: pw.Border.all()),
+                          child: pw.Center(child: pw.Text('Sin imagen disponible')),
                         ),
                       pw.SizedBox(height: 8),
-                      pw.Text('${_unidadNegocioController.text} ${_feederController.text} ${(_tipoCable == 'Cable de distribución' || _tipoCable == '4 Hilos') && _bufferController.text.isNotEmpty ? '${_bufferController.text} ' : ''}${_geolocalizacionElementoController.text} $descripcion', style: pw.TextStyle(fontSize: 10)),
+                      pw.Text('Poste $nroPoste - ${_unidadNegocioController.text} ${_feederController.text} ${(_tipoCable == 'Cable de distribución' || _tipoCable == '4 Hilos') && _bufferController.text.isNotEmpty ? '${_bufferController.text} ' : ''}$geolocalizacion - $descripcion', style: pw.TextStyle(fontSize: 10)),
                       pw.SizedBox(height: 16),
                     ],
                   );
@@ -778,21 +808,30 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                     const Text("Evidencia Fotográfica", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     _buildTextField('Descripción de evidencia fotográfica', _descripcionEvidenciaController),
                     const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        ElevatedButton.icon(
-                          icon: const Icon(Icons.photo_camera),
-                          label: Text('Adjuntar Fotos (${_fotosEvidencia.length})'),
-                          onPressed: _pickPhotos,
-                        ),
-                        const SizedBox(width: 8),
-                        if (_fotosEvidencia.isNotEmpty)
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
                           ElevatedButton.icon(
-                            icon: const Icon(Icons.clear),
-                            label: const Text('Limpiar'),
-                            onPressed: () => setState(() => _fotosEvidencia.clear()),
+                            icon: const Icon(Icons.photo_library),
+                            label: Text('Seleccionar Foto${_fotoSeleccionada != null ? ' (${_fotoSeleccionada!.name})' : ''}'),
+                            onPressed: _selectPhoto,
                           ),
-                      ],
+                          const SizedBox(width: 8),
+                          ElevatedButton.icon(
+                            icon: const Icon(Icons.upload),
+                            label: const Text('Cargar Foto'),
+                            onPressed: _fotoSeleccionada != null ? _loadPhoto : null,
+                          ),
+                          const SizedBox(width: 8),
+                          if (_evidenciaFotografica.isNotEmpty)
+                            ElevatedButton.icon(
+                              icon: const Icon(Icons.clear),
+                              label: Text('Limpiar (${_evidenciaFotografica.length})'),
+                              onPressed: () => setState(() => _evidenciaFotografica.clear()),
+                            ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 12),
                     SingleChildScrollView(
@@ -893,7 +932,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                             const DataColumn(label: Text('Tendido Acción')),
                             const DataColumn(label: Text('Reservas Actual')),
                             const DataColumn(label: Text('Reservas Acción')),
-                            const DataColumn(label: Text('Evidencia')),
+
                             if (_tipoCable == '4 Hilos') const DataColumn(label: Text('Mediciones 1550nm')),
                             if (_tipoCable == '4 Hilos') const DataColumn(label: Text('Mediciones 1490nm')),
                             const DataColumn(label: Text('Observaciones')),
@@ -919,7 +958,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                                 DataCell(Text(fila['tendidoAccion'] ?? '')),
                                 DataCell(Text(fila['reservasActual'] ?? '')),
                                 DataCell(Text(fila['reservasAccion'] ?? '')),
-                                DataCell(Text(fila['tieneEvidencia'] == true ? 'X' : '')),
+
                                 if (_tipoCable == '4 Hilos')
                                   DataCell(
                                     Table(

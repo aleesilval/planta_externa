@@ -3,6 +3,7 @@ import 'package:planta_externa/screens/planilla2.dart';
 import 'package:planta_externa/screens/planilla3.dart';
 import 'package:planta_externa/screens/planilla1.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:geolocator/geolocator.dart';
 import '../data/form_data_manager.dart';
 
 class WelcomePage extends StatefulWidget {
@@ -16,6 +17,8 @@ class _WelcomePageState extends State<WelcomePage> {
   int _selectedPlanilla = 1;
   final FormDataManager _dataManager = FormDataManager();
   String? _savePath;
+  Position? _ubicacionActual;
+  bool _obteniendoUbicacion = false;
 
   @override
   void initState() {
@@ -28,6 +31,32 @@ class _WelcomePageState extends State<WelcomePage> {
     setState(() {
       _savePath = savedData['savePath'];
     });
+  }
+
+  Future<void> _obtenerUbicacion() async {
+    setState(() {
+      _obteniendoUbicacion = true;
+    });
+    
+    try {
+      final pos = await Geolocator.getCurrentPosition();
+      setState(() {
+        _ubicacionActual = pos;
+        _obteniendoUbicacion = false;
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Ubicación: ${pos.latitude}, ${pos.longitude}')),
+      );
+    } catch (e) {
+      setState(() {
+        _obteniendoUbicacion = false;
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al obtener ubicación: $e')),
+      );
+    }
   }
 
   Future<void> _configureSavePath() async {
@@ -73,19 +102,23 @@ class _WelcomePageState extends State<WelcomePage> {
       appBar: AppBar(
         title: Row(
           children: [
-            const Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Bienvenido',
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                  ),
-                  Text(
-                    'Departamento Gestion Tecnica de Planta Externa',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.normal),
-                  ),
-                ],
+            Expanded(
+              child: Container(
+                height: 80,
+                child: const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'Bienvenido',
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      'Depto. Gestión Técnica\nPlanta Externa',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.normal),
+                    ),
+                  ],
+                ),
               ),
             ),
             Image.asset(
@@ -122,19 +155,44 @@ class _WelcomePageState extends State<WelcomePage> {
               child: const Text('Ir a la planilla'),
             ),
             const SizedBox(height: 20),
-            ElevatedButton.icon(
-              icon: const Icon(Icons.folder_open),
-              label: const Text('Configurar Ruta de Guardado'),
-              onPressed: _configureSavePath,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue[100],
-                foregroundColor: Colors.blue[800],
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.folder_open),
+                  label: const Text('Configurar Ruta'),
+                  onPressed: _configureSavePath,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue[100],
+                    foregroundColor: Colors.blue[800],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                ElevatedButton.icon(
+                  icon: _obteniendoUbicacion 
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.location_on),
+                  label: const Text('Obtener Ubicación'),
+                  onPressed: _obteniendoUbicacion ? null : _obtenerUbicacion,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green[100],
+                    foregroundColor: Colors.green[800],
+                  ),
+                ),
+              ],
             ),
             if (_savePath != null) ...[
               const SizedBox(height: 8),
               Text(
                 'Ruta actual: $_savePath',
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+                textAlign: TextAlign.center,
+              ),
+            ],
+            if (_ubicacionActual != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Ubicación: ${_ubicacionActual!.latitude.toStringAsFixed(6)}, ${_ubicacionActual!.longitude.toStringAsFixed(6)}',
                 style: const TextStyle(fontSize: 12, color: Colors.grey),
                 textAlign: TextAlign.center,
               ),

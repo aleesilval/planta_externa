@@ -21,6 +21,7 @@ Future<bool> generateAndCompressReport({
   required String nomenclatura,
   required Map<String, List<PlatformFile>> fotosPorSeccion,
   required BuildContext context,
+  required String savePath,
 }) async {
   try {
     final pdf = pw.Document();
@@ -68,14 +69,18 @@ Future<bool> generateAndCompressReport({
       }
     }
 
-    final downloadsDir = await getDownloadsDirectory();
-    final zipName = nomenclatura.isNotEmpty ? '$nomenclatura.zip' : 'reporte.zip';
-    final zipPath = '${downloadsDir!.path}/$zipName';
+    final safeName = nomenclatura.isNotEmpty ? nomenclatura.replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1F\s]'), '_') : 'reporte';
+    final zipName = '$safeName.zip';
+    final zipPath = '$savePath/$zipName';
     final zipFile = File(zipPath);
-    await zipFile.writeAsBytes(ZipEncoder().encode(archive)!);
-
-    return true;
+    final zipBytes = ZipEncoder().encode(archive);
+    if (zipBytes != null) {
+      await zipFile.writeAsBytes(zipBytes);
+      return true;
+    }
+    return false;
   } catch (e) {
+    debugPrint('Error generating ZIP: $e');
     return false;
   }
 }

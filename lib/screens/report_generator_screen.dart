@@ -4,6 +4,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:pdf/widgets.dart' as pw;
 // ignore: unused_import
 import 'package:printing/printing.dart';
+import 'package:flutter/foundation.dart';
 import 'report_logic.dart';
 import '../data/form_data_manager.dart';
 
@@ -670,6 +671,15 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
   }
 
   Future<void> _generarComprimido() async {
+    // Preguntar por la ruta de guardado
+    String? selectedDirectory = await FilePicker.platform.getDirectoryPath();
+    if (selectedDirectory == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Generación cancelada - No se seleccionó ruta de guardado')),
+      );
+      return;
+    }
+
     setState(() => _generando = true);
 
     try {
@@ -685,11 +695,20 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
         nomenclatura: _nomenclatura,
         fotosPorSeccion: _fotosPorSeccion,
         context: context,
+        savePath: selectedDirectory,
       );
 
       if (success) {
+        final zipName = _nomenclatura.isNotEmpty ? '$_nomenclatura.zip' : 'reporte.zip';
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Archivo comprimido generado exitosamente')),
+          SnackBar(
+            content: Text('Archivo $zipName generado exitosamente en:\n$selectedDirectory'),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error: No se pudo generar el archivo comprimido')),
         );
       }
     } catch (e) {
@@ -784,7 +803,6 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
                   pw.Text('Distancia NAP a FDT: ${_distanciaNapFdtController.text} mts'),
                   pw.Text('Distancia FDT a ODF: ${_distanciaFdtOdfController.text} mts'),
                   pw.Text('Cantidad de empalmes desde ODF: ${_cantidadEmpalmesController.text}'),
-                  pw.Text('Longitud de onda: ${_longitudOnda ?? "No especificada"}nm'),
                 ],
                 if (_elementoSeleccionado != "Closure") ...[
                   pw.Text('Tipo de Splitter: ${_tipoSplitterController.text}'),
@@ -1130,36 +1148,41 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
             _buildFotosSeccion(),
 
             const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.check),
-                  label: const Text("Datos Listos"),
-                  onPressed: () => setState(() => _datosListos = true),
-                ),
-                ElevatedButton.icon(
-                  icon: _generando ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.preview),
-                  label: const Text("Previsualizar Informe"),
-                  onPressed: _generando ? null : _previsualizarInforme,
-                ),
-                ElevatedButton.icon(
-                  icon: _generando ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.archive),
-                  label: const Text("Generar Comprimido"),
-                  onPressed: (_generando || !_datosListos) ? null : _generarComprimido,
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              icon: const Icon(Icons.clear_all),
-              label: const Text("Limpiar Campos"),
-              onPressed: _limpiarCampos,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red[100],
-                foregroundColor: Colors.red[800],
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.check),
+                    label: const Text("Datos Listos"),
+                    onPressed: () => setState(() => _datosListos = true),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton.icon(
+                    icon: _generando ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.preview),
+                    label: const Text("Previsualizar Informe"),
+                    onPressed: _generando ? null : _previsualizarInforme,
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton.icon(
+                    icon: _generando ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.archive),
+                    label: const Text("Generar Comprimido"),
+                    onPressed: (_generando || !_datosListos) ? null : _generarComprimido,
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.clear_all),
+                    label: const Text("Limpiar Campos"),
+                    onPressed: _limpiarCampos,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red[100],
+                      foregroundColor: Colors.red[800],
+                    ),
+                  ),
+                ],
               ),
             ),
+            const SizedBox(height: 16),
           ],
         ),
       ),
