@@ -694,8 +694,12 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
         campos: _getCampos(),
         nomenclatura: _nomenclatura,
         fotosPorSeccion: _fotosPorSeccion,
+        archivoOtdr: _archivoOtdr,
         context: context,
         savePath: selectedDirectory,
+        datosTecnicos: _getDatosTecnicos(),
+        mediciones: _medicionesGuardadas,
+        distribucionBuffers: _distribucionBuffers.isNotEmpty ? _distribucionBuffers : null,
       );
 
       if (success) {
@@ -772,6 +776,43 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
     return campos;
   }
 
+  Map<String, String> _getDatosTecnicos() {
+    Map<String, String> datosTecnicos = {
+      'Feeder': _feederController.text,
+      'Closure': _closureController.text,
+      'Buffer': _bufferController.text,
+      'Hilo': _hiloController.text,
+      'Tipo de Instalación': _tipoInstalacion,
+      'Contiene etiqueta de identificación': _contieneEtiquetaIdentificacion,
+      'Armado bajo norma': _armadoBajoNorma,
+      'Fijación bajo norma': _fijacionBajoNorma,
+      'Cantidad de cables de salida': _cantidadCablesSalidaController.text,
+    };
+    
+    // Campos específicos para NAP
+    if (_elementoSeleccionado == "NAP") {
+      datosTecnicos.addAll({
+        'Distancia NAP a FDT (mts)': _distanciaNapFdtController.text,
+        'Distancia FDT a ODF (mts)': _distanciaFdtOdfController.text,
+        'Cantidad de empalmes desde ODF': _cantidadEmpalmesController.text,
+        'Longitud de onda': _longitudOnda != null ? '${_longitudOnda}nm' : '',
+      });
+    }
+    
+    // Campos de splitter para NAP y FDT
+    if (_elementoSeleccionado != "Closure") {
+      datosTecnicos.addAll({
+        'Tipo de Splitter': _tipoSplitterController.text,
+        'Cantidad de Splitter': _cantidadSplitterController.text,
+      });
+    }
+    
+    // Remover campos vacíos
+    datosTecnicos.removeWhere((key, value) => value.isEmpty);
+    
+    return datosTecnicos;
+  }
+
   Future<pw.Document> _generarPDF({bool incluirFotos = true}) async {
     final pdf = pw.Document();
     final campos = _getCampos();
@@ -809,7 +850,7 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
                   pw.Text('Cantidad de Splitter: ${_cantidadSplitterController.text}'),
                 ],
                 if (_elementoSeleccionado == "Closure" && _closureNaturaleza == "Distribucion" && _distribucionBuffers.isNotEmpty) ...[
-                  pw.Text('Distribución por buffer: ${_distribucionBuffers.join(", ")}'),
+                  pw.Text('Distribución por buffer: ${_distribucionBuffers.join(", ")}')
                 ],
                 pw.Text('Contiene etiqueta de identificacion: $_contieneEtiquetaIdentificacion'),
                 pw.Text('Armado bajo norma: $_armadoBajoNorma'),

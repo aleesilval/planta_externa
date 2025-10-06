@@ -8,6 +8,132 @@ import 'package:file_picker/file_picker.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+Future<pw.Document> _generarPDFCompleto({
+  required String instalador,
+  required DateTime fecha,
+  required Position? ubicacion,
+  required String unidadNegocio,
+  required String? elemento,
+  required String? closureNaturaleza,
+  required String? fdtConClosureSecundario,
+  required Map<String, String> campos,
+  required String nomenclatura,
+  required Map<String, List<PlatformFile>> fotosPorSeccion,
+  required PlatformFile? archivoOtdr,
+  Map<String, String>? datosTecnicos,
+  Map<String, Map<int, String>>? mediciones,
+  List<String>? distribucionBuffers,
+}) async {
+  final pdf = pw.Document();
+  
+  pdf.addPage(
+    pw.Page(
+      pageFormat: PdfPageFormat.letter,
+      build: (pw.Context ctx) {
+        return pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Text('Reporte de Certificación', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
+            pw.SizedBox(height: 16),
+            pw.Text('Técnico: $instalador'),
+            pw.Text('Fecha: ${fecha.toLocal()}'),
+            pw.Text('Ubicación: ${ubicacion != null ? "${ubicacion.latitude}, ${ubicacion.longitude}" : "No disponible"}'),
+            pw.Text('Unidad de Negocios: $unidadNegocio'),
+            pw.Text('Elemento: $elemento'),
+            if (closureNaturaleza != null) pw.Text('Naturaleza: $closureNaturaleza'),
+            if (fdtConClosureSecundario != null) pw.Text('¿Con closure secundario?: $fdtConClosureSecundario'),
+            pw.SizedBox(height: 8),
+            ...campos.entries.map((e) => pw.Text('${e.key}: ${e.value}')),
+            pw.SizedBox(height: 8),
+            pw.Text('Nomenclatura: $nomenclatura', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+            
+            if (datosTecnicos != null && datosTecnicos.isNotEmpty) ...[
+              pw.SizedBox(height: 16),
+              pw.Text('Información Técnica $elemento', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+              ...datosTecnicos.entries.map((e) => pw.Text('${e.key}: ${e.value}')),
+            ],
+            
+            if (distribucionBuffers != null && distribucionBuffers.isNotEmpty) ...[
+              pw.SizedBox(height: 8),
+              pw.Text('Distribución por buffer: ${distribucionBuffers.join(", ")}'),
+            ],
+            
+            if (mediciones != null && mediciones.isNotEmpty) ...[
+              pw.SizedBox(height: 16),
+              pw.Text('Mediciones:', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+              ...mediciones.entries.map((entry) => 
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text('Mediciones ${entry.key}:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                    pw.Container(
+                      width: 400,
+                      height: 200,
+                      child: pw.Table(
+                        border: pw.TableBorder.all(),
+                        children: [
+                          for (int row = 0; row < 4; row++)
+                            pw.TableRow(
+                              children: [
+                                for (int col = 0; col < 4; col++)
+                                  pw.Container(
+                                    width: 100,
+                                    height: 50,
+                                    padding: const pw.EdgeInsets.all(4),
+                                    child: pw.Text('P${row * 4 + col + 1}: ${entry.value[row * 4 + col + 1] ?? "-"}', style: const pw.TextStyle(fontSize: 8)),
+                                  ),
+                              ],
+                            ),
+                        ],
+                      ),
+                    ),
+                    pw.SizedBox(height: 8),
+                  ],
+                )
+              ),
+            ],
+          ],
+        );
+      },
+    ),
+  );
+  
+  // Página de fotos y archivos adjuntos
+  if (fotosPorSeccion.isNotEmpty || archivoOtdr != null) {
+    pdf.addPage(
+      pw.Page(
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text('Fotos y Archivos Adjuntos', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 16),
+              ...fotosPorSeccion.entries.map((entry) => 
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text('${entry.key}:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                    ...entry.value.asMap().entries.map((foto) => 
+                      pw.Text('• ${entry.key.replaceAll(" ", "_")}_${foto.key + 1}.${foto.value.extension}')
+                    ),
+                    pw.SizedBox(height: 8),
+                  ],
+                )
+              ),
+              if (archivoOtdr != null) ...[
+                pw.Text('Trazas OTDR:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                pw.Text('• ${archivoOtdr.name}'),
+              ],
+            ],
+          );
+        },
+      ),
+    );
+  }
+  
+  return pdf;
+}
+
 
 Future<bool> generateAndCompressReport({
   required String instalador,
@@ -20,40 +146,35 @@ Future<bool> generateAndCompressReport({
   required Map<String, String> campos,
   required String nomenclatura,
   required Map<String, List<PlatformFile>> fotosPorSeccion,
+  required PlatformFile? archivoOtdr,
   required BuildContext context,
   required String savePath,
+  Map<String, String>? datosTecnicos,
+  Map<String, Map<int, String>>? mediciones,
+  List<String>? distribucionBuffers,
 }) async {
   try {
-    final pdf = pw.Document();
-    pdf.addPage(
-      pw.Page(
-        pageFormat: PdfPageFormat.letter,
-        build: (pw.Context ctx) {
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Text('Reporte de Instalación', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
-              pw.SizedBox(height: 16),
-              pw.Text('Instalador: $instalador'),
-              pw.Text('Fecha: ${fecha.toLocal()}'),
-              pw.Text('Ubicación: ${ubicacion != null ? "${ubicacion.latitude}, ${ubicacion.longitude}" : "No disponible"}'),
-              pw.Text('Unidad de Negocios: $unidadNegocio'),
-              pw.Text('Elemento: $elemento'),
-              if (closureNaturaleza != null) pw.Text('Naturaleza: $closureNaturaleza'),
-              if (fdtConClosureSecundario != null) pw.Text('¿Con closure secundario?: $fdtConClosureSecundario'),
-              pw.SizedBox(height: 8),
-              ...campos.entries.map((e) => pw.Text('${e.key}: ${e.value}')),
-              pw.SizedBox(height: 8),
-              pw.Text('Nomenclatura generada: $nomenclatura', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-            ],
-          );
-        },
-      ),
+    final pdf = await _generarPDFCompleto(
+      instalador: instalador,
+      fecha: fecha,
+      ubicacion: ubicacion,
+      unidadNegocio: unidadNegocio,
+      elemento: elemento,
+      closureNaturaleza: closureNaturaleza,
+      fdtConClosureSecundario: fdtConClosureSecundario,
+      campos: campos,
+      nomenclatura: nomenclatura,
+      fotosPorSeccion: fotosPorSeccion,
+      archivoOtdr: archivoOtdr,
+      datosTecnicos: datosTecnicos,
+      mediciones: mediciones,
+      distribucionBuffers: distribucionBuffers,
     );
 
     final archive = Archive();
     final pdfName = nomenclatura.isNotEmpty ? '$nomenclatura.pdf' : 'reporte.pdf';
-    archive.addFile(ArchiveFile(pdfName, (await pdf.save()).length, await pdf.save()));
+    final pdfBytes = await pdf.save();
+    archive.addFile(ArchiveFile(pdfName, pdfBytes.length, pdfBytes));
 
     for (final entry in fotosPorSeccion.entries) {
       final seccion = entry.key;
@@ -67,6 +188,14 @@ Future<bool> generateAndCompressReport({
           file.bytes ?? await File(file.path!).readAsBytes(),
         ));
       }
+    }
+
+    if (archivoOtdr != null) {
+      archive.addFile(ArchiveFile(
+        archivoOtdr.name,
+        archivoOtdr.size,
+        archivoOtdr.bytes ?? await File(archivoOtdr.path!).readAsBytes(),
+      ));
     }
 
     final safeName = nomenclatura.isNotEmpty ? nomenclatura.replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1F\s]'), '_') : 'reporte';
