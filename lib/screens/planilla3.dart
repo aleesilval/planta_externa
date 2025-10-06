@@ -195,20 +195,40 @@ class _Planilla3PageState extends State<Planilla3Page> {
       } catch (e) {
         // Continue without logo if it fails to load
       }
+      
+      // Cargar logo como marca de agua
+      pw.ImageProvider? logoImage;
+      try {
+        final logoWatermarkBytes = await rootBundle.load('assets/images/LOGO_INTER.png');
+        logoImage = pw.MemoryImage(logoWatermarkBytes.buffer.asUint8List());
+      } catch (_) {
+        logoImage = null;
+      }
     
     // Página 1: Portada
     pdf.addPage(
       pw.Page(
         build: (pw.Context context) {
-          return pw.Column(
+          return pw.Stack(
             children: [
-              // Header con logo fijo
-              if (logoBytes != null)
-                pw.Container(
-                  height: 80,
-                  width: double.infinity,
-                  child: pw.Image(pw.MemoryImage(logoBytes)),
+              // Marca de agua centrada
+              if (logoImage != null)
+                pw.Center(
+                  child: pw.Opacity(
+                    opacity: 0.1,
+                    child: pw.Image(logoImage, width: 300, height: 300),
+                  ),
                 ),
+              // Contenido principal
+              pw.Column(
+                children: [
+                  // Header con logo fijo
+                  if (logoBytes != null)
+                    pw.Container(
+                      height: 80,
+                      width: double.infinity,
+                      child: pw.Image(pw.MemoryImage(logoBytes)),
+                    ),
               pw.SizedBox(height: 20),
               pw.Expanded(
                 child: pw.Center(
@@ -218,6 +238,8 @@ class _Planilla3PageState extends State<Planilla3Page> {
                     textAlign: pw.TextAlign.center,
                   ),
                 ),
+              ),
+                ],
               ),
             ],
           );
@@ -229,28 +251,41 @@ class _Planilla3PageState extends State<Planilla3Page> {
     pdf.addPage(
       pw.Page(
         build: (pw.Context context) {
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
+          return pw.Stack(
             children: [
-              pw.Text('Fecha: $fechaFormateada'),
-              pw.SizedBox(height: 8),
-              pw.Text('Responsable: ${_tecnicoController.text}'),
-              pw.SizedBox(height: 8),
-              pw.Text('Tiempo de atención: ${_tiempoAtencionController.text}'),
-              pw.SizedBox(height: 8),
-              pw.Text('Bitácora:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-              pw.SizedBox(height: 4),
-              pw.Text('El día $fechaFormateada se presenta ${_afectacionController.text} en ${_direccionCortaController.text}'),
-              pw.SizedBox(height: 8),
-              pw.Text(_accionesRealizadasController.text),
-              pw.SizedBox(height: 8),
-              pw.Text('Solución:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-              pw.SizedBox(height: 4),
-              ..._soluciones.asMap().entries.map((entry) => pw.Text('${entry.key + 1}. ${entry.value}')),
-              pw.SizedBox(height: 8),
-              pw.Text('Conclusiones:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-              pw.SizedBox(height: 4),
-              pw.Text(_conclusionesController.text),
+              if (logoImage != null)
+                pw.Center(
+                  child: pw.Opacity(
+                    opacity: 0.1,
+                    child: pw.Image(logoImage, width: 300, height: 300),
+                  ),
+                ),
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text('Fecha: $fechaFormateada'),
+                  pw.SizedBox(height: 8),
+                  pw.Text('Responsable: ${_tecnicoController.text}'),
+                  pw.SizedBox(height: 8),
+                  pw.Text('Ubicación: ${_ubicacionActual != null ? "${_ubicacionActual!.latitude}, ${_ubicacionActual!.longitude}" : "No disponible"}'),
+                  pw.SizedBox(height: 8),
+                  pw.Text('Tiempo de atención: ${_tiempoAtencionController.text}'),
+                  pw.SizedBox(height: 8),
+                  pw.Text('Bitácora:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                  pw.SizedBox(height: 4),
+                  pw.Text('El día $fechaFormateada se presenta ${_afectacionController.text} en ${_direccionCortaController.text}'),
+                  pw.SizedBox(height: 8),
+                  pw.Text(_accionesRealizadasController.text),
+                  pw.SizedBox(height: 8),
+                  pw.Text('Solución:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                  pw.SizedBox(height: 4),
+                  ..._soluciones.asMap().entries.map((entry) => pw.Text('${entry.key + 1}. ${entry.value}')),
+                  pw.SizedBox(height: 8),
+                  pw.Text('Conclusiones:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                  pw.SizedBox(height: 4),
+                  pw.Text(_conclusionesController.text),
+                ],
+              ),
             ],
           );
         },
@@ -262,30 +297,41 @@ class _Planilla3PageState extends State<Planilla3Page> {
       pdf.addPage(
         pw.Page(
           build: (pw.Context context) {
-            return pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
+            return pw.Stack(
               children: [
-                pw.Text('Materiales Utilizados', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
-                pw.SizedBox(height: 16),
-                pw.Table(
-                  border: pw.TableBorder.all(),
+                if (logoImage != null)
+                  pw.Center(
+                    child: pw.Opacity(
+                      opacity: 0.1,
+                      child: pw.Image(logoImage, width: 300, height: 300),
+                    ),
+                  ),
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                    pw.TableRow(
+                    pw.Text('Materiales Utilizados', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+                    pw.SizedBox(height: 16),
+                    pw.Table(
+                      border: pw.TableBorder.all(),
                       children: [
-                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Artículo', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Descripción del Artículo', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Unidades', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Cantidad', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                        pw.TableRow(
+                          children: [
+                            pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Artículo', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                            pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Descripción del Artículo', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                            pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Unidades', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                            pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Cantidad', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                          ],
+                        ),
+                        ..._materiales.map((material) => pw.TableRow(
+                          children: [
+                            pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(material['codigo'] ?? '')),
+                            pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(material['material'] ?? '')),
+                            pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(material['unidades'] ?? '')),
+                            pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(material['cantidad'] ?? '')),
+                          ],
+                        )),
                       ],
                     ),
-                    ..._materiales.map((material) => pw.TableRow(
-                      children: [
-                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(material['codigo'] ?? '')),
-                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(material['material'] ?? '')),
-                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(material['unidades'] ?? '')),
-                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(material['cantidad'] ?? '')),
-                      ],
-                    )),
                   ],
                 ),
               ],
@@ -301,44 +347,55 @@ class _Planilla3PageState extends State<Planilla3Page> {
       pdf.addPage(
         pw.Page(
           build: (pw.Context context) {
-            return pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
+            return pw.Stack(
               children: [
-                pw.Text('Mediciones', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
-                pw.SizedBox(height: 16),
-                pw.Text('Mediciones 1550nm:', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
-                pw.SizedBox(height: 8),
-                pw.Table(
-                  border: pw.TableBorder.all(),
+                if (logoImage != null)
+                  pw.Center(
+                    child: pw.Opacity(
+                      opacity: 0.1,
+                      child: pw.Image(logoImage, width: 300, height: 300),
+                    ),
+                  ),
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                    for (int i = 0; i < 16; i += 4)
-                      pw.TableRow(
-                        children: [
-                          for (int j = 0; j < 4; j++)
-                            pw.Padding(
-                              padding: const pw.EdgeInsets.all(4),
-                              child: pw.Text('P${i + j + 1}: ${_medicionesPuertos1550[i + j].text} dBm', style: const pw.TextStyle(fontSize: 10)),
-                            ),
-                        ],
-                      ),
-                  ],
-                ),
-                pw.SizedBox(height: 16),
-                pw.Text('Mediciones 1490nm:', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
-                pw.SizedBox(height: 8),
-                pw.Table(
-                  border: pw.TableBorder.all(),
-                  children: [
-                    for (int i = 0; i < 16; i += 4)
-                      pw.TableRow(
-                        children: [
-                          for (int j = 0; j < 4; j++)
-                            pw.Padding(
-                              padding: const pw.EdgeInsets.all(4),
-                              child: pw.Text('P${i + j + 1}: ${_medicionesPuertos1490[i + j].text} dBm', style: const pw.TextStyle(fontSize: 10)),
-                            ),
-                        ],
-                      ),
+                    pw.Text('Mediciones', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+                    pw.SizedBox(height: 16),
+                    pw.Text('Mediciones 1550nm:', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+                    pw.SizedBox(height: 8),
+                    pw.Table(
+                      border: pw.TableBorder.all(),
+                      children: [
+                        for (int i = 0; i < 16; i += 4)
+                          pw.TableRow(
+                            children: [
+                              for (int j = 0; j < 4; j++)
+                                pw.Padding(
+                                  padding: const pw.EdgeInsets.all(4),
+                                  child: pw.Text('P${i + j + 1}: ${_medicionesPuertos1550[i + j].text} dBm', style: const pw.TextStyle(fontSize: 10)),
+                                ),
+                            ],
+                          ),
+                      ],
+                    ),
+                    pw.SizedBox(height: 16),
+                    pw.Text('Mediciones 1490nm:', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+                    pw.SizedBox(height: 8),
+                    pw.Table(
+                      border: pw.TableBorder.all(),
+                      children: [
+                        for (int i = 0; i < 16; i += 4)
+                          pw.TableRow(
+                            children: [
+                              for (int j = 0; j < 4; j++)
+                                pw.Padding(
+                                  padding: const pw.EdgeInsets.all(4),
+                                  child: pw.Text('P${i + j + 1}: ${_medicionesPuertos1490[i + j].text} dBm', style: const pw.TextStyle(fontSize: 10)),
+                                ),
+                            ],
+                          ),
+                      ],
+                    ),
                   ],
                 ),
               ],
@@ -353,35 +410,46 @@ class _Planilla3PageState extends State<Planilla3Page> {
       pdf.addPage(
         pw.Page(
           build: (pw.Context context) {
-            return pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
+            return pw.Stack(
               children: [
-                pw.Text('Evidencia Fotográfica', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
-                pw.SizedBox(height: 16),
-                ..._evidenciaFotografica.asMap().entries.map((entry) {
-                  final bytes = entry.value['bytes'] as Uint8List?;
-                  return pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      if (bytes != null)
-                        pw.Container(
-                          height: 200,
-                          width: double.infinity,
-                          child: pw.Image(pw.MemoryImage(bytes)),
-                        )
-                      else
-                        pw.Container(
-                          height: 200,
-                          width: double.infinity,
-                          decoration: pw.BoxDecoration(border: pw.Border.all()),
-                          child: pw.Center(child: pw.Text('Sin imagen disponible')),
-                        ),
-                      pw.SizedBox(height: 8),
-                      pw.Text('Descripción: ${entry.value['descripcion']}'),
-                      pw.SizedBox(height: 16),
-                    ],
-                  );
-                }),
+                if (logoImage != null)
+                  pw.Center(
+                    child: pw.Opacity(
+                      opacity: 0.1,
+                      child: pw.Image(logoImage, width: 300, height: 300),
+                    ),
+                  ),
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text('Evidencia Fotográfica', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+                    pw.SizedBox(height: 16),
+                    ..._evidenciaFotografica.asMap().entries.map((entry) {
+                      final bytes = entry.value['bytes'] as Uint8List?;
+                      return pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          if (bytes != null)
+                            pw.Container(
+                              height: 200,
+                              width: double.infinity,
+                              child: pw.Image(pw.MemoryImage(bytes)),
+                            )
+                          else
+                            pw.Container(
+                              height: 200,
+                              width: double.infinity,
+                              decoration: pw.BoxDecoration(border: pw.Border.all()),
+                              child: pw.Center(child: pw.Text('Sin imagen disponible')),
+                            ),
+                          pw.SizedBox(height: 8),
+                          pw.Text('Descripción: ${entry.value['descripcion']}'),
+                          pw.SizedBox(height: 16),
+                        ],
+                      );
+                    }),
+                  ],
+                ),
               ],
             );
           },
@@ -394,28 +462,7 @@ class _Planilla3PageState extends State<Planilla3Page> {
       );
       
       // Limpiar todos los datos después de exportar
-      setState(() {
-        _tecnicoController.clear();
-        _unidadNegocioController.clear();
-        _nomenclaturaController.clear();
-        _tiempoAtencionController.clear();
-        _afectacionController.clear();
-        _direccionCortaController.clear();
-        _accionesRealizadasController.clear();
-        _soluciones.clear();
-        _nuevaSolucionController.clear();
-        _conclusionesController.clear();
-        _descripcionFotoController.clear();
-        _evidenciaFotografica.clear();
-
-        _materiales.clear();
-        _codigoController.clear();
-        _descripcionSeleccionada = null;
-        _unidadSeleccionada = null;
-        _cantidadController.clear();
-        for (final c in _medicionesPuertos1550) { c.clear(); }
-        for (final c in _medicionesPuertos1490) { c.clear(); }
-      });
+      await _limpiarCampos();
     } catch (e) {
       // Show error message if PDF generation fails
       if (mounted) {
@@ -542,27 +589,49 @@ class _Planilla3PageState extends State<Planilla3Page> {
       // Continue without logo if it fails to load
     }
     
+    // Cargar logo como marca de agua
+    pw.ImageProvider? logoImage;
+    try {
+      final logoWatermarkBytes = await rootBundle.load('assets/images/LOGO_INTER.png');
+      logoImage = pw.MemoryImage(logoWatermarkBytes.buffer.asUint8List());
+    } catch (_) {
+      logoImage = null;
+    }
+    
+
+    
     // Página 1: Portada
     pdf.addPage(
       pw.Page(
         build: (pw.Context context) {
-          return pw.Column(
+          return pw.Stack(
             children: [
-              if (logoBytes != null)
-                pw.Container(
-                  height: 80,
-                  width: double.infinity,
-                  child: pw.Image(pw.MemoryImage(logoBytes)),
-                ),
-              pw.SizedBox(height: 20),
-              pw.Expanded(
-                child: pw.Center(
-                  child: pw.Text(
-                    'Informe de Reparación ${_afectacionController.text} - ${_nomenclaturaController.text} - ${_direccionCortaController.text}',
-                    style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
-                    textAlign: pw.TextAlign.center,
+              if (logoImage != null)
+                pw.Center(
+                  child: pw.Opacity(
+                    opacity: 0.1,
+                    child: pw.Image(logoImage, width: 300, height: 300),
                   ),
                 ),
+              pw.Column(
+                children: [
+                  if (logoBytes != null)
+                    pw.Container(
+                      height: 80,
+                      width: double.infinity,
+                      child: pw.Image(pw.MemoryImage(logoBytes)),
+                    ),
+                  pw.SizedBox(height: 20),
+                  pw.Expanded(
+                    child: pw.Center(
+                      child: pw.Text(
+                        'Informe de Reparación ${_afectacionController.text} - ${_nomenclaturaController.text} - ${_direccionCortaController.text}',
+                        style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
+                        textAlign: pw.TextAlign.center,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           );
@@ -580,6 +649,8 @@ class _Planilla3PageState extends State<Planilla3Page> {
               pw.Text('Fecha: $fechaFormateada'),
               pw.SizedBox(height: 8),
               pw.Text('Responsable: ${_tecnicoController.text}'),
+              pw.SizedBox(height: 8),
+              pw.Text('Ubicación: ${_ubicacionActual != null ? "${_ubicacionActual!.latitude}, ${_ubicacionActual!.longitude}" : "No disponible"}'),
               pw.SizedBox(height: 8),
               pw.Text('Tiempo de atención: ${_tiempoAtencionController.text}'),
               pw.SizedBox(height: 8),
@@ -736,6 +807,55 @@ class _Planilla3PageState extends State<Planilla3Page> {
     
     return pdf;
   }
+  
+  Future<void> _limpiarCampos() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirmar'),
+        content: const Text('¿Está seguro de que desea limpiar todos los campos?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Limpiar'),
+          ),
+        ],
+      ),
+    );
+    
+    if (confirmed == true) {
+      setState(() {
+        _tecnicoController.clear();
+        _unidadNegocioController.clear();
+        _nomenclaturaController.clear();
+        _tiempoAtencionController.clear();
+        _afectacionController.clear();
+        _direccionCortaController.clear();
+        _accionesRealizadasController.clear();
+        _soluciones.clear();
+        _nuevaSolucionController.clear();
+        _conclusionesController.clear();
+        _descripcionFotoController.clear();
+        _evidenciaFotografica.clear();
+
+        _materiales.clear();
+        _codigoController.clear();
+        _descripcionSeleccionada = null;
+        _unidadSeleccionada = null;
+        _cantidadController.clear();
+        for (final c in _medicionesPuertos1550) { c.clear(); }
+        for (final c in _medicionesPuertos1490) { c.clear(); }
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Campos limpiados')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -747,6 +867,11 @@ class _Planilla3PageState extends State<Planilla3Page> {
             icon: const Icon(Icons.save),
             onPressed: _guardarDatos,
             tooltip: 'Guardar datos',
+          ),
+          IconButton(
+            tooltip: "Limpiar todo",
+            icon: const Icon(Icons.cleaning_services),
+            onPressed: _limpiarCampos,
           ),
         ],
       ),
@@ -1014,6 +1139,21 @@ class _Planilla3PageState extends State<Planilla3Page> {
                     },
                     child: const Text("Agregar"),
                   ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: () {
+                      setState(() {
+                        _materiales.add({
+                          'codigo': '',
+                          'material': '',
+                          'unidades': '',
+                          'cantidad': '',
+                        });
+                      });
+                    },
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.grey[300]),
+                    child: const Text("Fila Vacía"),
+                  ),
                 ],
               ),
             ),
@@ -1090,7 +1230,7 @@ class _Planilla3PageState extends State<Planilla3Page> {
                               padding: const EdgeInsets.all(4.0),
                               child: TextFormField(
                                 controller: _medicionesPuertos1550[r * 4 + c],
-                                keyboardType: TextInputType.text,
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
                                 decoration: InputDecoration(
                                   labelText: "P${r * 4 + c + 1}",
                                   isDense: true,
@@ -1113,7 +1253,7 @@ class _Planilla3PageState extends State<Planilla3Page> {
                               padding: const EdgeInsets.all(4.0),
                               child: TextFormField(
                                 controller: _medicionesPuertos1490[r * 4 + c],
-                                keyboardType: TextInputType.text,
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
                                 decoration: InputDecoration(
                                   labelText: "P${r * 4 + c + 1}",
                                   isDense: true,
@@ -1219,6 +1359,7 @@ class _Planilla3PageState extends State<Planilla3Page> {
                 ),
               ],
             ),
+            const SizedBox(height: 50),
           ],
         ),
       ),

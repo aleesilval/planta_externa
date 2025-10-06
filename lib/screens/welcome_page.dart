@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:planta_externa/screens/planilla2.dart';
 import 'package:planta_externa/screens/planilla3.dart';
 import 'package:planta_externa/screens/planilla1.dart';
+import 'package:planta_externa/screens/autores_page.dart';
+import 'package:planta_externa/screens/manual_page.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:geolocator/geolocator.dart';
 import '../data/form_data_manager.dart';
@@ -205,6 +207,37 @@ class _WelcomePageState extends State<WelcomePage> {
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
               ),
+            ),
+            Text(
+              'Edicxon Mendoza',
+              style: TextStyle(
+                color: Colors.grey,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AutoresPage())),
+                  child: const Text('Autores'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange[100],
+                    foregroundColor: Colors.orange[800],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ManualPage())),
+                  child: const Text('Manual'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.purple[100],
+                    foregroundColor: Colors.purple[800],
+                  ),
+                ),
+              ],
             )
           ],
         ),

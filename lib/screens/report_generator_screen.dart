@@ -5,6 +5,7 @@ import 'package:pdf/widgets.dart' as pw;
 // ignore: unused_import
 import 'package:printing/printing.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'report_logic.dart';
 import '../data/form_data_manager.dart';
 
@@ -545,7 +546,7 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
                 border: const OutlineInputBorder(),
                 isDense: true,
               ),
-              keyboardType: TextInputType.number,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
             ),
           ),
         );
@@ -662,25 +663,29 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
         name: _nomenclatura.isNotEmpty ? '$_nomenclatura.pdf' : 'informe.pdf',
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al previsualizar: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al previsualizar: $e')),
+        );
+      }
     }
 
-    setState(() => _generando = false);
+    if (mounted) setState(() => _generando = false);
   }
 
   Future<void> _generarComprimido() async {
     // Preguntar por la ruta de guardado
     String? selectedDirectory = await FilePicker.platform.getDirectoryPath();
     if (selectedDirectory == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Generación cancelada - No se seleccionó ruta de guardado')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Generación cancelada - No se seleccionó ruta de guardado')),
+        );
+      }
       return;
     }
 
-    setState(() => _generando = true);
+    if (mounted) setState(() => _generando = true);
 
     try {
       final success = await generateAndCompressReport(
@@ -697,31 +702,32 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
         archivoOtdr: _archivoOtdr,
         context: context,
         savePath: selectedDirectory,
-        datosTecnicos: _getDatosTecnicos(),
-        mediciones: _medicionesGuardadas,
-        distribucionBuffers: _distribucionBuffers.isNotEmpty ? _distribucionBuffers : null,
       );
 
-      if (success) {
-        final zipName = _nomenclatura.isNotEmpty ? '$_nomenclatura.zip' : 'reporte.zip';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Archivo $zipName generado exitosamente en:\n$selectedDirectory'),
-            duration: const Duration(seconds: 5),
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Error: No se pudo generar el archivo comprimido')),
-        );
+      if (mounted) {
+        if (success) {
+          final zipName = _nomenclatura.isNotEmpty ? '$_nomenclatura.zip' : 'reporte.zip';
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Archivo $zipName generado exitosamente en:\n$selectedDirectory'),
+              duration: const Duration(seconds: 5),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Error: No se pudo generar el archivo comprimido')),
+          );
+        }
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al generar comprimido: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al generar comprimido: $e')),
+        );
+      }
     }
 
-    setState(() => _generando = false);
+    if (mounted) setState(() => _generando = false);
   }
 
   Map<String, String> _getCampos() {
@@ -817,6 +823,15 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
     final pdf = pw.Document();
     final campos = _getCampos();
     
+    // Cargar logo como marca de agua
+    pw.ImageProvider? logoImage;
+    try {
+      final logoBytes = await rootBundle.load('assets/images/LOGO_INTER.png');
+      logoImage = pw.MemoryImage(logoBytes.buffer.asUint8List());
+    } catch (_) {
+      logoImage = null;
+    }
+    
     pdf.addPage(
       pw.Page(
         build: (pw.Context context) {
@@ -901,9 +916,20 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
       pdf.addPage(
         pw.Page(
           build: (pw.Context context) {
-            return pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
+            return pw.Stack(
               children: [
+                // Marca de agua centrada
+                if (logoImage != null)
+                  pw.Center(
+                    child: pw.Opacity(
+                      opacity: 0.1,
+                      child: pw.Image(logoImage, width: 300, height: 300),
+                    ),
+                  ),
+                // Contenido principal
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
                 pw.Text('Fotos y Archivos Adjuntos', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
                 pw.SizedBox(height: 16),
                 ..._fotosPorSeccion.entries.map((entry) => 
@@ -922,11 +948,13 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
                   pw.Text('Trazas OTDR:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
                   pw.Text('• ${_archivoOtdr!.name}'),
                 ],
-              ],
-            );
-          },
-        ),
-      );
+                ],
+              ),
+            ],
+          );
+        },
+      ),
+    );
     }
     
     return pdf;
@@ -995,68 +1023,88 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
     );
   }
 
-  void _limpiarCampos() {
-    setState(() {
-      _tecnicoController.clear();
-      _unidadNegocioController.clear();
-      _feederController.clear();
-      _closureController.clear();
-      _bufferController.clear();
-      _hiloController.clear();
-      _elementoSeleccionado = null;
-      _closureNaturaleza = null;
-      _fdtConClosureSecundario = null;
-      
-      for (var ctrl in _napCampos.values) {
-        ctrl.clear();
-      }
-      for (var ctrl in _fdtCamposNo.values) {
-        ctrl.clear();
-      }
-      for (var ctrl in _fdtCamposSi.values) {
-        ctrl.clear();
-      }
-      for (var ctrl in _closureDistribucionCampos.values) {
-        ctrl.clear();
-      }
-      for (var ctrl in _closureSecundarioCampos.values) {
-        ctrl.clear();
-      }
-      for (var ctrl in _closureContinuidadCampos.values) {
-        ctrl.clear();
-      }
-      for (var ctrl in _closureReparacionCampos.values) {
-        ctrl.clear();
-      }
-      
-      _tipoInstalacion = 'Aerea';
-      _distanciaNapFdtController.clear();
-      _distanciaFdtOdfController.clear();
-      _cantidadEmpalmesController.clear();
-      _tipoSplitterController.clear();
-      _cantidadSplitterController.clear();
-      _contieneEtiquetaIdentificacion = 'Si';
-      _armadoBajoNorma = 'Si';
-      _fijacionBajoNorma = 'Si';
-      _cantidadCablesSalidaController.clear();
-      _medicionesGuardadas.clear();
-      _datosListos = false;
-      for (var controller in _medicionesPuertos.values) {
-        controller.clear();
-      }
-      _longitudOnda = null;
-      _medicionesPuertos.clear();
-      _archivoOtdr = null;
-      _fotosPorSeccion.clear();
-      _seccionesExpand.clear();
-      _nomenclatura = "";
-      _distribucionBuffers.clear();
-      _bufferSeleccionado = null;
-    });
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Campos limpiados')),
+  Future<void> _limpiarCampos() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirmar'),
+        content: const Text('¿Está seguro de que desea limpiar todos los campos?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Limpiar'),
+          ),
+        ],
+      ),
     );
+    
+    if (confirmed == true) {
+      setState(() {
+        _tecnicoController.clear();
+        _unidadNegocioController.clear();
+        _feederController.clear();
+        _closureController.clear();
+        _bufferController.clear();
+        _hiloController.clear();
+        _elementoSeleccionado = null;
+        _closureNaturaleza = null;
+        _fdtConClosureSecundario = null;
+        
+        for (var ctrl in _napCampos.values) {
+          ctrl.clear();
+        }
+        for (var ctrl in _fdtCamposNo.values) {
+          ctrl.clear();
+        }
+        for (var ctrl in _fdtCamposSi.values) {
+          ctrl.clear();
+        }
+        for (var ctrl in _closureDistribucionCampos.values) {
+          ctrl.clear();
+        }
+        for (var ctrl in _closureSecundarioCampos.values) {
+          ctrl.clear();
+        }
+        for (var ctrl in _closureContinuidadCampos.values) {
+          ctrl.clear();
+        }
+        for (var ctrl in _closureReparacionCampos.values) {
+          ctrl.clear();
+        }
+        
+        _tipoInstalacion = 'Aerea';
+        _distanciaNapFdtController.clear();
+        _distanciaFdtOdfController.clear();
+        _cantidadEmpalmesController.clear();
+        _tipoSplitterController.clear();
+        _cantidadSplitterController.clear();
+        _contieneEtiquetaIdentificacion = 'Si';
+        _armadoBajoNorma = 'Si';
+        _fijacionBajoNorma = 'Si';
+        _cantidadCablesSalidaController.clear();
+        _medicionesGuardadas.clear();
+        _datosListos = false;
+        for (var controller in _medicionesPuertos.values) {
+          controller.clear();
+        }
+        _longitudOnda = null;
+        _medicionesPuertos.clear();
+        _archivoOtdr = null;
+        _fotosPorSeccion.clear();
+        _seccionesExpand.clear();
+        _nomenclatura = "";
+        _distribucionBuffers.clear();
+        _bufferSeleccionado = null;
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Campos limpiados')),
+      );
+    }
   }
   @override
   Widget build(BuildContext context) {
