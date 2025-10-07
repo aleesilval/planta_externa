@@ -133,10 +133,11 @@ class _WelcomePageState extends State<WelcomePage> {
           ],
         ),
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
+      body: SingleChildScrollView(
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
             const Text(
               'Seleccione la planilla a utilizar',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
@@ -199,21 +200,29 @@ class _WelcomePageState extends State<WelcomePage> {
                 textAlign: TextAlign.center,
               ),
             ],
-            const SizedBox(height: 20),
-            Text(
-              'Creado por Alejandro Silva',
+
+            const SizedBox(height: 8),
+            const Text(
+              'Alejandro Silva',
               style: TextStyle(
                 color: Colors.grey,
                 fontSize: 12,
-                fontWeight: FontWeight.bold,
               ),
             ),
-            Text(
+            const Text(
               'Edicxon Mendoza',
               style: TextStyle(
                 color: Colors.grey,
                 fontSize: 12,
-                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Versión 1.0.0 - © 2024',
+              style: TextStyle(
+                color: Colors.grey,
+                fontSize: 10,
+                fontStyle: FontStyle.italic,
               ),
             ),
             const SizedBox(height: 20),
@@ -237,9 +246,19 @@ class _WelcomePageState extends State<WelcomePage> {
                     foregroundColor: Colors.purple[800],
                   ),
                 ),
+                const SizedBox(width: 16),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).pushNamed('/pin-management'),
+                  child: const Text('Seguridad'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red[100],
+                    foregroundColor: Colors.red[800],
+                  ),
+                ),
               ],
             )
-          ],
+            ],
+          ),
         ),
       ),
       

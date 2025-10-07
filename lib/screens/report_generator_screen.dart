@@ -871,7 +871,7 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
                 pw.Text('Armado bajo norma: $_armadoBajoNorma'),
                 pw.Text('Fijación bajo norma: $_fijacionBajoNorma'),
                 pw.Text('Cantidad de cables de salida: ${_cantidadCablesSalidaController.text}'),
-                if (_medicionesGuardadas.isNotEmpty) ...[
+                if (_medicionesGuardadas.isNotEmpty && _elementoSeleccionado != "NAP") ...[
                   pw.SizedBox(height: 8),
                   pw.Text('Mediciones:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
                   ..._medicionesGuardadas.entries.map((entry) => 
@@ -911,6 +911,91 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
         },
       ),
     );
+    
+    // Página separada para mediciones NAP
+    if (_elementoSeleccionado == "NAP" && _tieneMediciones()) {
+      pdf.addPage(
+        pw.Page(
+          build: (pw.Context context) {
+            return pw.Stack(
+              children: [
+                if (logoImage != null)
+                  pw.Center(
+                    child: pw.Opacity(
+                      opacity: 0.1,
+                      child: pw.Image(logoImage, width: 300, height: 300),
+                    ),
+                  ),
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text('Mediciones', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+                    pw.SizedBox(height: 16),
+                    // Mediciones 1490nm
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text('Mediciones 1490nm:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                        pw.Container(
+                          width: 400,
+                          height: 200,
+                          child: pw.Table(
+                            border: pw.TableBorder.all(),
+                            children: [
+                              for (int row = 0; row < 4; row++)
+                                pw.TableRow(
+                                  children: [
+                                    for (int col = 0; col < 4; col++)
+                                      pw.Container(
+                                        width: 100,
+                                        height: 50,
+                                        padding: const pw.EdgeInsets.all(4),
+                                        child: pw.Text('P${row * 4 + col + 1}: - ${_medicionesGuardadas['1490nm']?[row * 4 + col + 1] ?? ""}', style: const pw.TextStyle(fontSize: 8)),
+                                      ),
+                                  ],
+                                ),
+                            ],
+                          ),
+                        ),
+                        pw.SizedBox(height: 16),
+                      ],
+                    ),
+                    // Mediciones 1550nm
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text('Mediciones 1550nm:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                        pw.Container(
+                          width: 400,
+                          height: 200,
+                          child: pw.Table(
+                            border: pw.TableBorder.all(),
+                            children: [
+                              for (int row = 0; row < 4; row++)
+                                pw.TableRow(
+                                  children: [
+                                    for (int col = 0; col < 4; col++)
+                                      pw.Container(
+                                        width: 100,
+                                        height: 50,
+                                        padding: const pw.EdgeInsets.all(4),
+                                        child: pw.Text('P${row * 4 + col + 1}: - ${_medicionesGuardadas['1550nm']?[row * 4 + col + 1] ?? ""}', style: const pw.TextStyle(fontSize: 8)),
+                                      ),
+                                  ],
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            );
+          },
+        ),
+      );
+    }
     
     if (incluirFotos) {
       pdf.addPage(
@@ -960,6 +1045,10 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
     return pdf;
   }
   
+  bool _tieneMediciones() {
+    return _medicionesGuardadas.values.any((mediciones) => mediciones.isNotEmpty);
+  }
+
   void _guardarMediciones() {
     if (_longitudOnda == null) return;
     
