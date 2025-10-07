@@ -156,9 +156,7 @@ class _Planilla3PageState extends State<Planilla3Page> {
     );
   }
   
-  void _onCodigoChanged() {
-    // No longer needed - will be replaced by dropdown selection
-  }
+
   
   void _onDescripcionChanged(String? descripcion) {
     if (descripcion != null) {
@@ -1118,7 +1116,7 @@ class _Planilla3PageState extends State<Planilla3Page> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  ElevatedButton(
+                  ElevatedButton.icon(
                     onPressed: () {
                       final descripcion = _descripcionSeleccionada == "Otro" ? _materialController.text : _descripcionSeleccionada;
                       if (_codigoController.text.isNotEmpty && descripcion != null && descripcion.isNotEmpty && _unidadSeleccionada != null) {
@@ -1137,22 +1135,12 @@ class _Planilla3PageState extends State<Planilla3Page> {
                         });
                       }
                     },
-                    child: const Text("Agregar"),
-                  ),
-                  const SizedBox(width: 8),
-                  ElevatedButton(
-                    onPressed: () {
-                      setState(() {
-                        _materiales.add({
-                          'codigo': '',
-                          'material': '',
-                          'unidades': '',
-                          'cantidad': '',
-                        });
-                      });
-                    },
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.grey[300]),
-                    child: const Text("Fila Vacía"),
+                    icon: const Icon(Icons.add),
+                    label: const Text("Agregar"),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                    ),
                   ),
                 ],
               ),

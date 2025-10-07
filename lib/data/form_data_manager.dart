@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-
 class FormDataManager {
   static final FormDataManager _instance = FormDataManager._internal();
   factory FormDataManager() => _instance;

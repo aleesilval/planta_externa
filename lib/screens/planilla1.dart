@@ -8,11 +8,251 @@ import 'package:printing/printing.dart'; // Para imprimir/exportar PDFs
 import 'package:planta_externa/geo_field.dart'; // Widget personalizado para geolocalización
 import 'dart:io';
 import 'dart:convert'; // Para JSON
-import 'dart:typed_data';
+import 'dart:math' as math; // Para funciones matemáticas
 import 'package:path_provider/path_provider.dart'; // Para acceso al sistema de archivos
 import 'package:file_picker/file_picker.dart'; // Para selección de archivos
 import 'package:flutter/services.dart'; // Para cargar assets
+import 'package:http/http.dart' as http;
 import '../data/form_data_manager.dart';
+
+/// Widget de mapa con fondo real
+class MapaConFondo extends StatefulWidget {
+  final List<Map<String, dynamic>> coordenadas;
+  
+  const MapaConFondo({super.key, required this.coordenadas});
+  
+  @override
+  State<MapaConFondo> createState() => _MapaConFondoState();
+}
+
+class _MapaConFondoState extends State<MapaConFondo> {
+  Uint8List? _mapaFondo;
+  late double _centerLat, _centerLng;
+  late int _zoom, _tileX, _tileY;
+  
+  @override
+  void initState() {
+    super.initState();
+    _calcularParametrosMapa();
+    _cargarMapaFondo();
+  }
+  
+  void _calcularParametrosMapa() {
+    final lats = widget.coordenadas.map((c) => c['lat']! as double).toList();
+    final lngs = widget.coordenadas.map((c) => c['lng']! as double).toList();
+    
+    _centerLat = lats.reduce((a, b) => a + b) / lats.length;
+    _centerLng = lngs.reduce((a, b) => a + b) / lngs.length;
+    
+    // Calcular zoom basado en el área que cubren los puntos
+    _zoom = _calcularZoomOptimo(lats, lngs);
+    
+    _tileX = _lngToTileX(_centerLng, _zoom);
+    _tileY = _latToTileY(_centerLat, _zoom);
+  }
+  
+  int _calcularZoomOptimo(List<double> lats, List<double> lngs) {
+    if (widget.coordenadas.length == 1) return 12;
+    
+    final minLat = lats.reduce((a, b) => a < b ? a : b);
+    final maxLat = lats.reduce((a, b) => a > b ? a : b);
+    final minLng = lngs.reduce((a, b) => a < b ? a : b);
+    final maxLng = lngs.reduce((a, b) => a > b ? a : b);
+    
+    final latDiff = maxLat - minLat;
+    final lngDiff = maxLng - minLng;
+    final maxDiff = math.max(latDiff, lngDiff);
+    
+    // Zoom ajustado ligeramente
+    if (maxDiff > 0.15) return 8;      // Área muy grande
+    if (maxDiff > 0.08) return 9;      // Área grande
+    if (maxDiff > 0.04) return 10;     // Área mediana
+    if (maxDiff > 0.015) return 11;    // Área pequeña
+    return 12;                         // Puntos cercanos
+  }
+  
+  Future<void> _cargarMapaFondo() async {
+    if (widget.coordenadas.isEmpty) return;
+    
+    try {
+      final url = 'https://tile.openstreetmap.org/$_zoom/$_tileX/$_tileY.png';
+      final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 5));
+      if (response.statusCode == 200 && mounted) {
+        setState(() {
+          _mapaFondo = response.bodyBytes;
+        });
+      }
+    } catch (_) {}
+  }
+  
+  int _lngToTileX(double lng, int zoom) {
+    return ((lng + 180.0) / 360.0 * (1 << zoom)).floor();
+  }
+  
+  int _latToTileY(double lat, int zoom) {
+    final latRad = lat * math.pi / 180.0;
+    return ((1.0 - math.log(math.tan(latRad) + 1.0 / math.cos(latRad)) / math.pi) / 2.0 * (1 << zoom)).floor();
+  }
+  
+  // Convierte coordenadas geográficas a píxeles centrado en el punto medio
+  Offset coordToPixel(double lat, double lng, Size size) {
+    final tileSize = 256.0;
+    final scale = 1 << _zoom;
+    
+    // Convertir coordenadas del punto a coordenadas mundiales
+    final worldX = (lng + 180.0) / 360.0 * scale;
+    final latRad = lat * math.pi / 180.0;
+    final worldY = (1.0 - math.log(math.tan(latRad) + 1.0 / math.cos(latRad)) / math.pi) / 2.0 * scale;
+    
+    // Convertir centro del mapa a coordenadas mundiales
+    final centerWorldX = (_centerLng + 180.0) / 360.0 * scale;
+    final centerLatRad = _centerLat * math.pi / 180.0;
+    final centerWorldY = (1.0 - math.log(math.tan(centerLatRad) + 1.0 / math.cos(centerLatRad)) / math.pi) / 2.0 * scale;
+    
+    // Calcular offset desde el centro
+    final offsetX = (worldX - centerWorldX) * tileSize;
+    final offsetY = (worldY - centerWorldY) * tileSize;
+    
+    // Posicionar relativo al centro del widget
+    final pixelX = size.width / 2 + offsetX;
+    final pixelY = size.height / 2 + offsetY;
+    
+    return Offset(pixelX, pixelY);
+  }
+  
+  // Calcula estadísticas de coordenadas
+  Map<String, double> get estadisticasCoordenadas {
+    final lats = widget.coordenadas.map((c) => c['lat']! as double).toList();
+    final lngs = widget.coordenadas.map((c) => c['lng']! as double).toList();
+    
+    final sumaLat = lats.reduce((a, b) => a + b);
+    final sumaLng = lngs.reduce((a, b) => a + b);
+    final puntoMedioLat = sumaLat / lats.length;
+    final puntoMedioLng = sumaLng / lngs.length;
+    
+    return {
+      'sumaLat': sumaLat,
+      'sumaLng': sumaLng,
+      'puntoMedioLat': puntoMedioLat,
+      'puntoMedioLng': puntoMedioLng,
+      'totalPuntos': lats.length.toDouble(),
+    };
+  }
+  
+  // Obtiene los bytes de la imagen del mapa para exportar
+  Uint8List? get mapaImagenBytes => _mapaFondo;
+  
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 300,
+      decoration: BoxDecoration(border: Border.all(color: Colors.grey)),
+      child: Stack(
+        children: [
+          if (_mapaFondo != null)
+            Positioned.fill(
+              child: Image.memory(_mapaFondo!, fit: BoxFit.cover),
+            )
+          else
+            Container(
+              color: Colors.grey[200],
+              child: const Center(
+                child: CircularProgressIndicator(),
+              ),
+            ),
+          Positioned.fill(
+            child: CustomPaint(
+              painter: RutaPainter(widget.coordenadas, coordToPixel),
+            ),
+          ),
+          // Mostrar estadísticas de coordenadas
+          Positioned(
+            top: 5,
+            left: 5,
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Punto medio: ${estadisticasCoordenadas['puntoMedioLat']!.toStringAsFixed(6)}, ${estadisticasCoordenadas['puntoMedioLng']!.toStringAsFixed(6)}',
+                    style: const TextStyle(color: Colors.white, fontSize: 10),
+                  ),
+                  Text(
+                    'Puntos: ${estadisticasCoordenadas['totalPuntos']!.toInt()} | Zoom: $_zoom',
+                    style: const TextStyle(color: Colors.white, fontSize: 10),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Painter solo para la ruta y marcadores
+class RutaPainter extends CustomPainter {
+  final List<Map<String, dynamic>> coordenadas;
+  final Offset Function(double lat, double lng, Size size) coordToPixel;
+  
+  RutaPainter(this.coordenadas, this.coordToPixel);
+  
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (coordenadas.isEmpty) return;
+    
+    // Dibujar líneas entre puntos
+    if (coordenadas.length > 1) {
+      final linePaint = Paint()
+        ..color = Colors.red
+        ..strokeWidth = 3
+        ..style = PaintingStyle.stroke;
+      
+      for (int i = 0; i < coordenadas.length - 1; i++) {
+        final start = coordToPixel(coordenadas[i]['lat'], coordenadas[i]['lng'], size);
+        final end = coordToPixel(coordenadas[i + 1]['lat'], coordenadas[i + 1]['lng'], size);
+        canvas.drawLine(start, end, linePaint);
+      }
+    }
+    
+    // Dibujar marcadores
+    final markerPaint = Paint()..color = Colors.red;
+    final borderPaint = Paint()
+      ..color = Colors.white
+      ..strokeWidth = 2
+      ..style = PaintingStyle.stroke;
+    final textPainter = TextPainter(
+      textDirection: TextDirection.ltr,
+      textAlign: TextAlign.center,
+    );
+    
+    for (final coord in coordenadas) {
+      final point = coordToPixel(coord['lat'], coord['lng'], size);
+      
+      // Dibujar círculo con borde blanco
+      canvas.drawCircle(point, 10, markerPaint);
+      canvas.drawCircle(point, 10, borderPaint);
+      
+      // Dibujar número del poste
+      textPainter.text = TextSpan(
+        text: '${coord['poste']}',
+        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+      );
+      textPainter.layout();
+      textPainter.paint(canvas, Offset(point.dx - textPainter.width / 2, point.dy - textPainter.height / 2));
+    }
+  }
+  
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
 
 /// Widget wrapper que contiene el formulario principal
 class FormularioPage extends StatelessWidget {
@@ -71,6 +311,180 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
     } catch (_) {} // Ignora errores de guardado
   }
 
+  /// Muestra previsualización de la ruta
+  Future<void> _previsualizarRuta() async {
+    final coordenadas = <Map<String, dynamic>>[];
+    for (final fila in _tabla) {
+      final geo = fila['geolocalizacionElemento'] as String?;
+      final poste = fila['contador'];
+      if (geo != null && geo.isNotEmpty && geo.contains(',') && poste != null) {
+        final parts = geo.split(',');
+        if (parts.length >= 2) {
+          final lat = double.tryParse(parts[0].trim());
+          final lng = double.tryParse(parts[1].trim());
+          if (lat != null && lng != null && lat.abs() <= 90 && lng.abs() <= 180) {
+            coordenadas.add({'lat': lat, 'lng': lng, 'poste': poste});
+          }
+        }
+      }
+    }
+    
+    if (coordenadas.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No hay coordenadas válidas para mostrar la ruta')),
+      );
+      return;
+    }
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Previsualización de Ruta'),
+        content: SizedBox(
+          width: 400,
+          height: 500,
+          child: Column(
+            children: [
+              _generarMapaLocal(),
+              const SizedBox(height: 16),
+              const Text('Postes en la ruta:', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Table(
+                    border: TableBorder.all(),
+                    children: [
+                      const TableRow(
+                        children: [
+                          Padding(padding: EdgeInsets.all(4), child: Text('Nro', style: TextStyle(fontWeight: FontWeight.bold))),
+                          Padding(padding: EdgeInsets.all(4), child: Text('Coordenadas', style: TextStyle(fontWeight: FontWeight.bold))),
+                        ],
+                      ),
+                      ...coordenadas.map((coord) => TableRow(
+                        children: [
+                          Padding(padding: const EdgeInsets.all(4), child: Text('${coord['poste']}')),
+                          Padding(padding: const EdgeInsets.all(4), child: Text('${coord['lat']}, ${coord['lng']}')),
+                        ],
+                      )),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cerrar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Genera un widget de mapa con fondo real
+  Widget _generarMapaLocal() {
+    final coordenadas = <Map<String, dynamic>>[];
+    for (final fila in _tabla) {
+      final geo = fila['geolocalizacionElemento'] as String?;
+      final poste = fila['contador'];
+      if (geo != null && geo.isNotEmpty && geo.contains(',') && poste != null) {
+        final parts = geo.split(',');
+        if (parts.length >= 2) {
+          final lat = double.tryParse(parts[0].trim());
+          final lng = double.tryParse(parts[1].trim());
+          if (lat != null && lng != null && lat.abs() <= 90 && lng.abs() <= 180) {
+            coordenadas.add({'lat': lat, 'lng': lng, 'poste': poste});
+          }
+        }
+      }
+    }
+    
+    if (coordenadas.isEmpty) {
+      return Container(
+        height: 300,
+        decoration: BoxDecoration(border: Border.all(color: Colors.grey)),
+        child: const Center(child: Text('No hay coordenadas para mostrar')),
+      );
+    }
+    
+    return MapaConFondo(coordenadas: coordenadas);
+  }
+  
+  /// Genera imagen del mapa para PDF
+  Future<Uint8List?> _generarImagenMapaParaPDF() async {
+    final coordenadas = <Map<String, dynamic>>[];
+    for (final fila in _tabla) {
+      final geo = fila['geolocalizacionElemento'] as String?;
+      final poste = fila['contador'];
+      if (geo != null && geo.isNotEmpty && geo.contains(',') && poste != null) {
+        final parts = geo.split(',');
+        if (parts.length >= 2) {
+          final lat = double.tryParse(parts[0].trim());
+          final lng = double.tryParse(parts[1].trim());
+          if (lat != null && lng != null && lat.abs() <= 90 && lng.abs() <= 180) {
+            coordenadas.add({'lat': lat, 'lng': lng, 'poste': poste});
+          }
+        }
+      }
+    }
+    
+    if (coordenadas.isEmpty) return null;
+    
+    // Crear widget temporal para obtener la imagen
+    final mapaWidget = MapaConFondo(coordenadas: coordenadas);
+    
+    // Simular la misma lógica del widget para obtener la imagen de fondo
+    try {
+      final lats = coordenadas.map((c) => c['lat']! as double).toList();
+      final lngs = coordenadas.map((c) => c['lng']! as double).toList();
+      final centerLat = lats.reduce((a, b) => a + b) / lats.length;
+      final centerLng = lngs.reduce((a, b) => a + b) / lngs.length;
+      
+      // Calcular zoom usando la misma lógica
+      final minLat = lats.reduce((a, b) => a < b ? a : b);
+      final maxLat = lats.reduce((a, b) => a > b ? a : b);
+      final minLng = lngs.reduce((a, b) => a < b ? a : b);
+      final maxLng = lngs.reduce((a, b) => a > b ? a : b);
+      final latDiff = maxLat - minLat;
+      final lngDiff = maxLng - minLng;
+      final maxDiff = math.max(latDiff, lngDiff);
+      
+      int zoom;
+      if (coordenadas.length == 1) {
+        zoom = 13;
+      } else if (maxDiff > 0.2) {
+        zoom = 8;
+      } else if (maxDiff > 0.1) {
+        zoom = 9;
+      } else if (maxDiff > 0.05) {
+        zoom = 10;
+      } else if (maxDiff > 0.02) {
+        zoom = 11;
+      } else if (maxDiff > 0.01) {
+        zoom = 12;
+      } else {
+        zoom = 13;
+      }
+      
+      final tileX = ((centerLng + 180.0) / 360.0 * (1 << zoom)).floor();
+      final latRad = centerLat * math.pi / 180.0;
+      final tileY = ((1.0 - math.log(math.tan(latRad) + 1.0 / math.cos(latRad)) / math.pi) / 2.0 * (1 << zoom)).floor();
+      
+      final url = 'https://tile.openstreetmap.org/$zoom/$tileX/$tileY.png';
+      final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
+      
+      if (response.statusCode == 200) {
+        return response.bodyBytes;
+      }
+    } catch (e) {
+      print('Error generando imagen de mapa para PDF: $e');
+    }
+    
+    return null;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -115,7 +529,10 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
 
   // Poste propiedad de Inter y acción
   String _posteInter = 'Sí';
-  final TextEditingController _accionPosteInterController = TextEditingController();
+  String _identificacionManual = 'Sí';
+  String _mantenimientoPreventivo = 'Sí';
+  String _accionPosteInter = ' - ';
+  final TextEditingController _fechaCorreccionController = TextEditingController();
 
   // Poste ya inspeccionado
   String _posteInspeccionado = 'No';
@@ -135,7 +552,8 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
   final TextEditingController _yk01Controller = TextEditingController();
   final TextEditingController _nomenclaturaElementoController = TextEditingController();
 
-  // Geolocalización + dropdowns para tendido actual/acción
+  // Tarjeta de identificación y tendido
+  String _tarjetaIdentificacion = 'Posee';
   String _tendidoActual = 'Bajo norma';
   String _tendidoAccion = ' - ';
 
@@ -180,7 +598,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
     ],
   };
   final List<String> _opcionesMorseteria = ['Bajo Norma', 'Fuera de Norma'];
-  final List<String> _opcionesElementoFijacion = ['1 fleje','2 fleje','1 tirraje','2 tirraje','otro','adiciona'];
+  final List<String> _opcionesElementoFijacion = [' - ','1 fleje','2 fleje','1 tirraje','2 tirraje','otro'];
   final List<String> _opcionesMateriales = [
     ' - ',
     'Adición de fleje faltante',
@@ -191,12 +609,27 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
     'Colocación de YK01',
   ];
   final List<String> _opcionesPosteInter = ['Sí', 'No'];
+  final List<String> _opcionesIdentificacionManual = ['Sí', 'No'];
+  final List<String> _opcionesMantenimientoPreventivo = ['Sí', 'No'];
+  final List<String> _opcionesAccionPosteInter = [
+    ' - ',
+    'Se agenda pintado bajo norma',
+    'Se ejecuta pintado bajo norma',
+    'Se agenda correccion de poste doblado',
+    'Se ejecuta correccion de poste doblado',
+    'Se agenda correccion de poste caido',
+    'Se ejecuta correccion de poste caido',
+    'Se agenda correccion de poste corroido',
+    'Se ejecuta correccion de poste corroido',
+    'No procede'
+  ];
   final List<String> _opcionesPosteInspeccionado = ['Sí', 'No'];
   final List<String> _opcionesObsDiseno = ['Sí', 'No'];
   final List<String> _opcionesTendidoActual = ['Bajo norma', 'Fuera de norma'];
   final List<String> _opcionesTendidoAccion = ['Se corrige', 'Se agenda correccion', 'No procede'];
   final List<String> _opcionesReservasActual = ['Bajo norma', 'Fuera de norma'];
-  final List<String> _opcionesReservasAccion = ['Se corrige', 'Se agenda correccion', 'No procede'];
+  final List<String> _opcionesReservasAccion = ['Se rehace la reserva', 'Se coloca precinto', 'Se mueve reserva', 'Se agenda correccion', 'No procede'];
+  final List<String> _opcionesTarjetaIdentificacion = ['Posee', 'Se coloca', 'Se reemplaza'];
   final List<String> _opcionesRequierePoda = ['Sí', 'No'];
 
   List<String> get _opcionesTendidoAccionDinamicas {
@@ -269,7 +702,10 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
         _fdtPadreController.clear();
         _observacionesDiseno = 'Sí';
         _posteInter = 'Sí';
-        _accionPosteInterController.clear();
+        _identificacionManual = 'Sí';
+        _mantenimientoPreventivo = 'Sí';
+        _accionPosteInter = ' - ';
+        _fechaCorreccionController.clear();
         _posteInspeccionado = 'No';
         _materialesUtilizados = _opcionesMateriales[0];
         _soporteRetencionController.clear();
@@ -277,9 +713,10 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
         _morseteriaIdentificada = 'Bajo Norma';
         _tipoElemento = opcionesTipoElemento[0];
         _modeloElementoFijado = _opcionesModeloElemento[_tipoElemento]![0];
-        _elementoFijacion = '1 fleje';
+        _elementoFijacion = ' - ';
         _cantidadElementoController.clear();
         _geolocalizacionElementoController.clear();
+        _tarjetaIdentificacion = 'Posee';
         _tendidoActual = _opcionesTendidoActual[0];
         _tendidoAccion = ' - ';
         _reservasActual = _opcionesReservasActual[0];
@@ -319,6 +756,8 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
           _editNro = null;
         } else {
           final fila = _filaActual(_contador);
+          print('=== DEBUG GRABAR FILA ===');
+          print('Geolocalización guardada: "${fila['geolocalizacionElemento']}"');
           _tabla.add(fila);
 
           _contador++;
@@ -328,6 +767,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
         _soporteSuspensionController.clear();
         _cantidadElementoController.clear();
         _geolocalizacionElementoController.clear();
+        _tarjetaIdentificacion = 'Posee';
         _tendidoActual = _opcionesTendidoActual[0];
         _tendidoAccion = ' - ';
         _reservasActual = _opcionesReservasActual[0];
@@ -337,7 +777,9 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
         _zonasPodaFinController.clear();
         _observacionesController.clear();
         _trabajosPendientesController.clear();
-        _accionPosteInterController.clear();
+        _accionPosteInter = ' - ';
+        _identificacionManual = 'Sí';
+        _mantenimientoPreventivo = 'Sí';
         _materialesUtilizados = _opcionesMateriales[0];
         _posteInter = 'Sí';
         _posteInspeccionado = 'No';
@@ -367,7 +809,10 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
     'nomenclaturaElemento': _nomenclaturaElementoController.text,
     'observacionesDiseno': _observacionesDiseno,
     'posteInter': _posteInter,
-    'accionPosteInter': _posteInter == 'Sí' ? _accionPosteInterController.text : ' - ',
+    'identificacionManual': _posteInter == 'Sí' ? _identificacionManual : ' - ',
+    'mantenimientoPreventivo': _posteInter == 'Sí' && _identificacionManual == 'Sí' ? _mantenimientoPreventivo : ' - ',
+    'accionPosteInter': _posteInter == 'Sí' && _identificacionManual == 'Sí' && _mantenimientoPreventivo == 'Sí' ? _accionPosteInter : ' - ',
+    'fechaCorreccion': _accionPosteInter.contains('Se agenda') ? _fechaCorreccionController.text : ' - ',
     'posteInspeccionado': _posteInspeccionado,
     'materialesUtilizados': _materialesUtilizados,
     'soporteRetencion': _soporteRetencionController.text,
@@ -378,6 +823,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
     'elementoFijacion': _elementoFijacion,
     'cantidadElemento': _cantidadElementoController.text,
     'geolocalizacionElemento': _geolocalizacionElementoController.text,
+    'tarjetaIdentificacion': _tarjetaIdentificacion,
     'tendidoActual': _tendidoActual,
     'tendidoAccion': _tendidoAccion,
     'reservasActual': _reservasActual,
@@ -405,7 +851,10 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
         _fdtPadreController.text = fila['fdtPadre'] ?? '';
         _observacionesDiseno = fila['observacionesDiseno'] ?? 'Sí';
         _posteInter = fila['posteInter'] ?? 'Sí';
-        _accionPosteInterController.text = fila['accionPosteInter'] ?? '';
+        _identificacionManual = fila['identificacionManual'] ?? 'Sí';
+        _mantenimientoPreventivo = fila['mantenimientoPreventivo'] ?? 'Sí';
+        _accionPosteInter = fila['accionPosteInter'] ?? ' - ';
+        _fechaCorreccionController.text = fila['fechaCorreccion'] ?? '';
         _posteInspeccionado = fila['posteInspeccionado'] ?? 'No';
         _materialesUtilizados = fila['materialesUtilizados'] ?? _opcionesMateriales[0];
         _soporteRetencionController.text = fila['soporteRetencion'] ?? '';
@@ -416,6 +865,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
         _elementoFijacion = fila['elementoFijacion'];
         _cantidadElementoController.text = fila['cantidadElemento'];
         _geolocalizacionElementoController.text = fila['geolocalizacionElemento'];
+        _tarjetaIdentificacion = fila['tarjetaIdentificacion'] ?? 'Posee';
         _tendidoActual = fila['tendidoActual'] ?? _opcionesTendidoActual[0];
         _tendidoAccion = fila['tendidoAccion'] ?? _opcionesTendidoAccion[0];
         _reservasActual = fila['reservasActual'] ?? _opcionesReservasActual[0];
@@ -642,8 +1092,9 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                     decoration: const pw.BoxDecoration(color: PdfColors.grey300),
                     children: [
                       pw.Text('Nro', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
+                      pw.Text('YK01', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
                       pw.Text('Obs. Diseño', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
-                      pw.Text('Poste Inter', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
+                      pw.Text('Propiedad de Inter', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
                       pw.Text('Acción Poste Inter', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
                       pw.Text('Poste inspeccionado', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
                       pw.Text('Soporte de Retención', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
@@ -654,6 +1105,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                       pw.Text('Elemento de fijación', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
                       pw.Text('Descripción de fijación', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
                       pw.Text('Geolocalización', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
+                      pw.Text('Tarjeta Identificación', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
                       pw.Text('Tendido Actual', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
                       pw.Text('Tendido Acción', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
                       pw.Text('Reservas Actual', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
@@ -670,6 +1122,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                   ..._tabla.map((fila) => pw.TableRow(
                     children: [
                       pw.Text('${fila['contador']}', style: const pw.TextStyle(fontSize: 3)),
+                      pw.Text(fila['yk01'] ?? '', style: const pw.TextStyle(fontSize: 3)),
                       pw.Text(fila['observacionesDiseno'] ?? '', style: const pw.TextStyle(fontSize: 3)),
                       pw.Text(fila['posteInter'] ?? '', style: const pw.TextStyle(fontSize: 3)),
                       pw.Text(fila['accionPosteInter'] ?? '', style: const pw.TextStyle(fontSize: 3)),
@@ -682,6 +1135,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                       pw.Text(fila['elementoFijacion'] ?? '', style: const pw.TextStyle(fontSize: 3)),
                       pw.Text(fila['cantidadElemento'] ?? '', style: const pw.TextStyle(fontSize: 3)),
                       pw.Text(fila['geolocalizacionElemento'] ?? '', style: const pw.TextStyle(fontSize: 3)),
+                      pw.Text(fila['tarjetaIdentificacion'] ?? '', style: const pw.TextStyle(fontSize: 3)),
                       pw.Text(fila['tendidoActual'] ?? '', style: const pw.TextStyle(fontSize: 3)),
                       pw.Text(fila['tendidoAccion'] ?? '', style: const pw.TextStyle(fontSize: 3)),
                       pw.Text(fila['reservasActual'] ?? '', style: const pw.TextStyle(fontSize: 3)),
@@ -737,8 +1191,82 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
       ),
     );
     
-    // Página de evidencia fotográfica
+    // Páginas de evidencia fotográfica
     if (_evidenciaFotografica.isNotEmpty) {
+      const int photosPerPage = 3;
+      for (int pageIndex = 0; pageIndex < (_evidenciaFotografica.length / photosPerPage).ceil(); pageIndex++) {
+        final startIndex = pageIndex * photosPerPage;
+        final endIndex = (startIndex + photosPerPage).clamp(0, _evidenciaFotografica.length);
+        final photosForPage = _evidenciaFotografica.sublist(startIndex, endIndex);
+        
+        pdf.addPage(
+          pw.Page(
+            pageFormat: PdfPageFormat.letter,
+            margin: const pw.EdgeInsets.all(12),
+            build: (context) {
+              return pw.Stack(
+                children: [
+                  // Marca de agua centrada
+                  if (logoImage != null)
+                    pw.Center(
+                      child: pw.Opacity(
+                        opacity: 0.1,
+                        child: pw.Image(logoImage, width: 300, height: 300),
+                      ),
+                    ),
+                  // Contenido principal
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                  pw.Text('Evidencia Fotográfica - Página ${pageIndex + 1}', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+                  pw.SizedBox(height: 16),
+                  ...photosForPage.map((evidencia) {
+                    final bytes = evidencia['bytes'] as Uint8List?;
+                    final descripcion = evidencia['descripcion'] as String;
+                    final geolocalizacion = evidencia['geolocalizacion'] as String? ?? '';
+                    
+                    return pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        if (bytes != null)
+                          pw.Container(
+                            height: 180,
+                            width: double.infinity,
+                            child: pw.Image(pw.MemoryImage(bytes), fit: pw.BoxFit.contain),
+                          )
+                        else
+                          pw.Container(
+                            height: 180,
+                            width: double.infinity,
+                            decoration: pw.BoxDecoration(border: pw.Border.all()),
+                            child: pw.Center(child: pw.Text('Sin imagen disponible')),
+                          ),
+                        pw.SizedBox(height: 8),
+                        pw.Text('${_unidadNegocioController.text} ${_feederController.text} ${(_tipoCable == 'Cable de distribución' || _tipoCable == '4 Hilos') && _bufferController.text.isNotEmpty ? '${_bufferController.text} ' : ''}$geolocalizacion - $descripcion', style: const pw.TextStyle(fontSize: 10)),
+                        pw.SizedBox(height: 16),
+                      ],
+                    );
+                  }),
+
+                  ],
+                ),
+              ],
+              );
+            },
+          ),
+        );
+      }
+    }
+    
+    // Página de mapa de ruta (siempre se muestra si hay datos)
+    if (_tabla.isNotEmpty) {
+      final mapaBytes = await _generarImagenMapaParaPDF();
+      final coordenadasValidas = _tabla.where((fila) => 
+        fila['geolocalizacionElemento'] != null && 
+        fila['geolocalizacionElemento'].toString().isNotEmpty &&
+        fila['geolocalizacionElemento'].toString().contains(',')
+      ).toList();
+      
       pdf.addPage(
         pw.Page(
           pageFormat: PdfPageFormat.letter,
@@ -746,7 +1274,6 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
           build: (context) {
             return pw.Stack(
               children: [
-                // Marca de agua centrada
                 if (logoImage != null)
                   pw.Center(
                     child: pw.Opacity(
@@ -754,54 +1281,58 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                       child: pw.Image(logoImage, width: 300, height: 300),
                     ),
                   ),
-                // Contenido principal
                 pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                pw.Text('Evidencia Fotográfica', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
-                pw.SizedBox(height: 16),
-                ..._evidenciaFotografica.map((evidencia) {
-                  final foto = evidencia['foto'] as PlatformFile;
-                  final bytes = evidencia['bytes'] as Uint8List?;
-                  final descripcion = evidencia['descripcion'] as String;
-                  final geolocalizacion = evidencia['geolocalizacion'] as String? ?? '';
-                  
-                  return pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      if (bytes != null)
-                        pw.Container(
-                          height: 200,
-                          width: double.infinity,
-                          child: pw.Image(pw.MemoryImage(bytes)),
-                        )
-                      else
-                        pw.Container(
-                          height: 200,
-                          width: double.infinity,
-                          decoration: pw.BoxDecoration(border: pw.Border.all()),
-                          child: pw.Center(child: pw.Text('Sin imagen disponible')),
+                    pw.Text('Ruta Recorrida', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+                    pw.SizedBox(height: 16),
+                    pw.Container(
+                      width: double.infinity,
+                      height: 300,
+                      decoration: pw.BoxDecoration(border: pw.Border.all()),
+                      child: pw.Center(
+                        child: pw.Column(
+                          mainAxisAlignment: pw.MainAxisAlignment.center,
+                          children: [
+                            pw.Text('Mapa de Ruta', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+                            pw.SizedBox(height: 8),
+                            pw.Text('Coordenadas válidas: ${coordenadasValidas.length}', style: const pw.TextStyle(fontSize: 12)),
+                            pw.Text('Total de postes: ${_tabla.length}', style: const pw.TextStyle(fontSize: 12)),
+                            pw.SizedBox(height: 8),
+                            pw.Text('Ver previsualización en la aplicación', style: const pw.TextStyle(fontSize: 10)),
+                          ],
                         ),
-                      pw.SizedBox(height: 8),
-                      pw.Text('${_unidadNegocioController.text} ${_feederController.text} ${(_tipoCable == 'Cable de distribución' || _tipoCable == '4 Hilos') && _bufferController.text.isNotEmpty ? '${_bufferController.text} ' : ''}$geolocalizacion - $descripcion', style: pw.TextStyle(fontSize: 10)),
-                      pw.SizedBox(height: 16),
-                    ],
-                  );
-                }).toList(),
-                // Agregar postes sin evidencia
-                ..._tabla.where((fila) => !_evidenciaFotografica.any((ev) => ev['nroPoste'] == fila['contador'])).map((fila) => 
-                  pw.Padding(
-                    padding: const pw.EdgeInsets.only(bottom: 8),
-                    child: pw.Text('${_unidadNegocioController.text} ${_feederController.text} ${(_tipoCable == 'Cable de distribución' || _tipoCable == '4 Hilos') && _bufferController.text.isNotEmpty ? '${_bufferController.text} ' : ''}${_geolocalizacionElementoController.text} Sin evidencia', style: pw.TextStyle(fontSize: 10)),
-                  )
-                  ),
-                ],
-              ),
-            ],
-          );
-        },
-      ),
-    );
+                      ),
+                    ),
+                    pw.SizedBox(height: 16),
+                    pw.Text('Postes inspeccionados:', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
+                    pw.SizedBox(height: 8),
+                    pw.Table(
+                      border: pw.TableBorder.all(),
+                      children: [
+                        pw.TableRow(
+                          children: [
+                            pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text('Nro Poste', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10))),
+                            pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text('Geolocalización', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10))),
+                          ],
+                        ),
+                        ..._tabla.map((fila) => 
+                          pw.TableRow(
+                            children: [
+                              pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text('${fila['contador']}', style: const pw.TextStyle(fontSize: 9))),
+                              pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text('${fila['geolocalizacionElemento'] ?? 'Sin coordenadas'}', style: const pw.TextStyle(fontSize: 9))),
+                            ],
+                          )
+                        ).toList(),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            );
+          },
+        ),
+      );
     }
     
     await Printing.layoutPdf(
@@ -817,6 +1348,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
     if (!tipoElementoOptions.contains(_tipoElemento)) _tipoElemento = tipoElementoOptions[0];
     final modeloOptions = _opcionesModeloElemento[_tipoElemento]!;
     if (!modeloOptions.contains(_modeloElementoFijado)) _modeloElementoFijado = modeloOptions[0];
+    if (!_opcionesElementoFijacion.contains(_elementoFijacion)) _elementoFijacion = _opcionesElementoFijacion[0];
 
     return Scaffold(
       appBar: AppBar(
@@ -860,7 +1392,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                     _buildDropdownField('Hilos', _hilos, hilosOptions, (val) {
                       setState(() { _hilos = val!; });
                     }, enabled: !_bloquearCabecera),
-                    _buildTextField('YK01', _yk01Controller),
+                    _buildTextField('YK01', _yk01Controller, inputType: TextInputType.number),
                     GeoField(
                       controller: _geolocalizacionElementoController,
                       label: 'Geolocalización del elemento fijado',
@@ -872,14 +1404,66 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                       setState(() { _posteInspeccionado = val!; });
                     }),
                     _buildDropdownField('Poste propiedad de Inter', _posteInter, _opcionesPosteInter, (val) {
-                      setState(() { _posteInter = val!; if (_posteInter == 'No') _accionPosteInterController.text = ' - '; else _accionPosteInterController.clear(); });
+                      setState(() { 
+                        _posteInter = val!; 
+                        if (_posteInter == 'No') {
+                          _identificacionManual = 'Sí';
+                          _mantenimientoPreventivo = 'Sí';
+                          _accionPosteInter = ' - ';
+                        }
+                      });
                     }),
-                    _buildTextField('Acción Poste propiedad de Inter', _accionPosteInterController, enabled: _posteInter == 'Sí'),
+                    if (_posteInter == 'Sí')
+                      _buildDropdownField('Identificación acorde a manual de mantenimiento', _identificacionManual, _opcionesIdentificacionManual, (val) {
+                        setState(() { 
+                          _identificacionManual = val!;
+                          if (_identificacionManual == 'No') {
+                            _mantenimientoPreventivo = 'Sí';
+                            _accionPosteInter = ' - ';
+                          }
+                        });
+                      }),
+                    if (_posteInter == 'Sí' && _identificacionManual == 'Sí')
+                      _buildDropdownField('Requiere mantenimiento preventivo', _mantenimientoPreventivo, _opcionesMantenimientoPreventivo, (val) {
+                        setState(() { 
+                          _mantenimientoPreventivo = val!;
+                          if (_mantenimientoPreventivo == 'No') {
+                            _accionPosteInter = ' - ';
+                          }
+                        });
+                      }),
+                    if (_posteInter == 'Sí' && _identificacionManual == 'Sí' && _mantenimientoPreventivo == 'Sí')
+                      _buildDropdownField('Acción Poste Propiedad de Inter', _accionPosteInter, _opcionesAccionPosteInter, (val) {
+                        setState(() { 
+                          _accionPosteInter = val!;
+                          if (!val.contains('Se agenda')) {
+                            _fechaCorreccionController.clear();
+                          }
+                        });
+                      }),
+                    if (_posteInter == 'Sí' && _identificacionManual == 'Sí' && _mantenimientoPreventivo == 'Sí' && _accionPosteInter.contains('Se agenda'))
+                      _buildDateField('Fecha de corrección', _fechaCorreccionController),
                     _buildDropdownField('Materiales utilizados', _materialesUtilizados, _opcionesMateriales, (val) {
                       setState(() { _materialesUtilizados = val!; });
                     }),
-                    _buildTextField(labelSoporteRetencion, _soporteRetencionController),
-                    _buildTextField(labelSoporteSuspension, _soporteSuspensionController, enabled: !bloquearNomenclaturaNAP),
+                    _buildTextField(labelSoporteRetencion, _soporteRetencionController, 
+                      inputType: TextInputType.number,
+                      enabled: _soporteSuspensionController.text.isEmpty,
+                      onChanged: (value) {
+                        if (value.isNotEmpty) {
+                          _soporteSuspensionController.clear();
+                        }
+                      }
+                    ),
+                    _buildTextField(labelSoporteSuspension, _soporteSuspensionController, 
+                      inputType: TextInputType.number,
+                      enabled: !bloquearNomenclaturaNAP && _soporteRetencionController.text.isEmpty,
+                      onChanged: (value) {
+                        if (value.isNotEmpty) {
+                          _soporteRetencionController.clear();
+                        }
+                      }
+                    ),
                     _buildDropdownField('Identificación de la morsetería', _morseteriaIdentificada, _opcionesMorseteria, (val) {
                       setState(() { _morseteriaIdentificada = val!; });
                     }),
@@ -897,6 +1481,9 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                       setState(() { _elementoFijacion = val!; });
                     }),
                     _buildTextField('Descripción de fijación', _cantidadElementoController, enabled: _elementoFijacion == 'otro'),
+                    _buildDropdownField('Posee tarjeta de identificación', _tarjetaIdentificacion, _opcionesTarjetaIdentificacion, (val) {
+                      setState(() { _tarjetaIdentificacion = val!; });
+                    }),
                     // Tendido con perdida de tensión actual/acción
                     _buildDropdownField('Tendido con perdida de tensión actual', _tendidoActual, _opcionesTendidoActual, (val) { 
                       setState(() { 
@@ -1078,6 +1665,16 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                             if (nro != null) _cargarFila(nro);
                           },
                         ),
+                          const SizedBox(width: 8),
+                          ElevatedButton.icon(
+                            icon: const Icon(Icons.route),
+                            label: const Text('Previsualizar Ruta'),
+                            onPressed: _tabla.isEmpty ? null : _previsualizarRuta,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.orange,
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -1108,6 +1705,8 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                             const DataColumn(label: Text('Nro')),
                             const DataColumn(label: Text('Obs. Diseño')),
                             const DataColumn(label: Text('Poste Inter')),
+                            const DataColumn(label: Text('Identificación Manual')),
+                            const DataColumn(label: Text('Mantenimiento Preventivo')),
                             const DataColumn(label: Text('Acción Poste Inter')),
                             const DataColumn(label: Text('Poste inspeccionado')),
                             DataColumn(label: Text(labelSoporteRetencion)),
@@ -1118,6 +1717,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                             const DataColumn(label: Text('Elemento de fijación')),
                             const DataColumn(label: Text('Descripción de fijación')),
                             const DataColumn(label: Text('Geolocalización')),
+                            const DataColumn(label: Text('Tarjeta Identificación')),
                             const DataColumn(label: Text('Tendido Actual')),
                             const DataColumn(label: Text('Tendido Acción')),
                             const DataColumn(label: Text('Reservas Actual')),
@@ -1132,24 +1732,35 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                           rows: _tabla.map((fila) {
                             return DataRow(
                               cells: [
-                                DataCell(Text('${fila['contador']}')),
-                                DataCell(Text(fila['observacionesDiseno'] ?? '')),
-                                DataCell(Text(fila['posteInter'] ?? '')),
-                                DataCell(Text(fila['accionPosteInter'] ?? '')),
-                                DataCell(Text(fila['posteInspeccionado'] ?? '')),
-                                DataCell(Text(fila['soporteRetencion'] ?? '')),
-                                DataCell(Text(fila['soporteSuspension'] ?? '')),
-                                DataCell(Text(fila['morseteriaIdentificada'] ?? '')),
-                                DataCell(Text(fila['tipoElemento'] ?? '')),
-                                DataCell(Text(fila['modeloElementoFijado'] ?? '')),
-                                DataCell(Text(fila['elementoFijacion'] ?? '')),
-                                DataCell(Text(fila['cantidadElemento'] ?? '')),
-                                DataCell(Text(fila['geolocalizacionElemento'] ?? '')),
-                                DataCell(Text(fila['tendidoActual'] ?? '')),
-                                DataCell(Text(fila['tendidoAccion'] ?? '')),
-                                DataCell(Text(fila['reservasActual'] ?? '')),
-                                DataCell(Text(fila['reservasAccion'] ?? '')),
-                                DataCell(Text(fila['requierePoda'] ?? '')),
+                                DataCell(Text('${fila['contador']}', style: const TextStyle(fontSize: 10))),
+                                DataCell(Text(fila['observacionesDiseno'] ?? '', style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis, maxLines: 3)),
+                                DataCell(Text(fila['posteInter'] ?? '', style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis, maxLines: 3)),
+                                DataCell(Text(fila['identificacionManual'] ?? '', style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis, maxLines: 3)),
+                                DataCell(Text(fila['mantenimientoPreventivo'] ?? '', style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis, maxLines: 3)),
+                                DataCell(
+                                  SizedBox(
+                                    width: 144,
+                                    child: SingleChildScrollView(
+                                      scrollDirection: Axis.horizontal,
+                                      child: Text(fila['accionPosteInter'] ?? '', style: const TextStyle(fontSize: 8)),
+                                    ),
+                                  ),
+                                ),
+                                DataCell(Text(fila['posteInspeccionado'] ?? '', style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis, maxLines: 3)),
+                                DataCell(Text(fila['soporteRetencion'] ?? '', style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis, maxLines: 3)),
+                                DataCell(Text(fila['soporteSuspension'] ?? '', style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis, maxLines: 3)),
+                                DataCell(Text(fila['morseteriaIdentificada'] ?? '', style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis, maxLines: 3)),
+                                DataCell(Text(fila['tipoElemento'] ?? '', style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis, maxLines: 3)),
+                                DataCell(Text(fila['modeloElementoFijado'] ?? '', style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis, maxLines: 3)),
+                                DataCell(Text(fila['elementoFijacion'] ?? '', style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis, maxLines: 3)),
+                                DataCell(Text(fila['cantidadElemento'] ?? '', style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis, maxLines: 3)),
+                                DataCell(Text(fila['geolocalizacionElemento'] ?? '', style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis, maxLines: 3)),
+                                DataCell(Text(fila['tarjetaIdentificacion'] ?? '', style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis, maxLines: 3)),
+                                DataCell(Text(fila['tendidoActual'] ?? '', style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis, maxLines: 3)),
+                                DataCell(Text(fila['tendidoAccion'] ?? '', style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis, maxLines: 3)),
+                                DataCell(Text(fila['reservasActual'] ?? '', style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis, maxLines: 3)),
+                                DataCell(Text(fila['reservasAccion'] ?? '', style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis, maxLines: 3)),
+                                DataCell(Text(fila['requierePoda'] ?? '', style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis, maxLines: 3)),
 
                                 if (_tipoCable == '4 Hilos')
                                   DataCell(
@@ -1162,7 +1773,8 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                                             child: Text(
                                               "P${i+1}: "
                                                 "${fila['medicionesPuertos1550'] != null && fila['medicionesPuertos1550'].length > i ? fila['medicionesPuertos1550'][i] : ''} dBm",
-                                              style: const TextStyle(fontSize: 5, fontFamily: 'monospace'),
+                                              style: const TextStyle(fontSize: 8, fontFamily: 'monospace'),
+                                              overflow: TextOverflow.ellipsis,
                                             ),
                                           ),
                                         ]),
@@ -1180,15 +1792,16 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                                             child: Text(
                                               "P${i+1}: "
                                                 "${fila['medicionesPuertos1490'] != null && fila['medicionesPuertos1490'].length > i ? fila['medicionesPuertos1490'][i] : ''} dBm",
-                                              style: const TextStyle(fontSize: 5, fontFamily: 'monospace'),
+                                              style: const TextStyle(fontSize: 8, fontFamily: 'monospace'),
+                                              overflow: TextOverflow.ellipsis,
                                             ),
                                           ),
                                         ]),
                                       ),
                                     ),
                                   ),
-                                DataCell(Text(fila['observaciones'] ?? '')),
-                                DataCell(Text(fila['trabajosPendientes'] ?? '')),
+                                DataCell(Text(fila['observaciones'] ?? '', style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis, maxLines: 3)),
+                                DataCell(Text(fila['trabajosPendientes'] ?? '', style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis, maxLines: 3)),
                               ],
                             );
                           }).toList(),
@@ -1212,12 +1825,14 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
     );
   }
 
-  Widget _buildTextField(String label, TextEditingController controller, {bool enabled = true}) {
+  Widget _buildTextField(String label, TextEditingController controller, {bool enabled = true, TextInputType? inputType, Function(String)? onChanged}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: TextFormField(
         controller: controller,
         enabled: enabled,
+        keyboardType: inputType,
+        onChanged: onChanged,
         decoration: InputDecoration(
           labelText: label,
           border: const OutlineInputBorder(),
@@ -1237,8 +1852,39 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
           border: const OutlineInputBorder(),
           isDense: true,
         ),
-        items: items.map((item) => DropdownMenuItem(value: item, child: Text(item))).toList(),
+        isExpanded: true,
+        items: items.map((item) => DropdownMenuItem(
+          value: item, 
+          child: Text(item, overflow: TextOverflow.ellipsis, maxLines: 2)
+        )).toList(),
         onChanged: enabled ? onChanged : null,
+      ),
+    );
+  }
+
+  Widget _buildDateField(String label, TextEditingController controller) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: TextFormField(
+        controller: controller,
+        readOnly: true,
+        decoration: InputDecoration(
+          labelText: label,
+          border: const OutlineInputBorder(),
+          isDense: true,
+          suffixIcon: const Icon(Icons.calendar_today),
+        ),
+        onTap: () async {
+          final date = await showDatePicker(
+            context: context,
+            initialDate: DateTime.now(),
+            firstDate: DateTime.now(),
+            lastDate: DateTime.now().add(const Duration(days: 365)),
+          );
+          if (date != null) {
+            controller.text = '${date.day}/${date.month}/${date.year}';
+          }
+        },
       ),
     );
   }
