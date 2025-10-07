@@ -63,10 +63,11 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
         title: const Text('Configuración Inicial de Seguridad'),
         automaticallyImplyLeading: false,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
             const Text(
               'Configure los PINs de seguridad para la aplicación',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -126,7 +127,8 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
                     : const Text('Configurar PINs'),
               ),
             ),
-          ],
+            ],
+          ),
         ),
       ),
     );

@@ -9,10 +9,11 @@ class ManualPage extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Manual'),
       ),
-      body: const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
+      body: const SingleChildScrollView(
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
             Text(
               'Manual de Usuario',
               style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
@@ -23,7 +24,8 @@ class ManualPage extends StatelessWidget {
               style: TextStyle(fontSize: 16),
               textAlign: TextAlign.center,
             ),
-          ],
+            ],
+          ),
         ),
       ),
     );

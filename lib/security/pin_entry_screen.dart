@@ -75,11 +75,12 @@ class _PinEntryScreenState extends State<PinEntryScreen> {
         title: Text(_currentMode == 'user' ? 'Acceso de Usuario' : 'Acceso de Administrador'),
         automaticallyImplyLeading: false,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
             Icon(
               _currentMode == 'user' ? Icons.person : Icons.admin_panel_settings,
               size: 80,
@@ -139,7 +140,8 @@ class _PinEntryScreenState extends State<PinEntryScreen> {
                 },
                 child: const Text('Gestionar PINs'),
               ),
-          ],
+            ],
+          ),
         ),
       ),
     );

@@ -104,9 +104,11 @@ class _PinManagementScreenState extends State<PinManagementScreen> {
       appBar: AppBar(
         title: const Text('Gestión de PINs'),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: !_adminVerified ? _buildAdminVerification() : _buildManagementOptions(),
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: !_adminVerified ? _buildAdminVerification() : _buildManagementOptions(),
+        ),
       ),
     );
   }

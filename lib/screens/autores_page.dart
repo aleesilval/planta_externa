@@ -121,7 +121,7 @@ class _AutoresPageState extends State<AutoresPage> {
                             );
                           },
                           child: const Text(
-                            'LinkedIn: edicxon-jose-mendoza-carrasco',
+                            'LinkedIn: Edicxon Mendoza',
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.green,
@@ -156,7 +156,7 @@ class _AutoresPageState extends State<AutoresPage> {
                     const SizedBox(height: 12),
                     const Text('• Versión: 1.0.0', style: TextStyle(fontSize: 14)),
                     const SizedBox(height: 4),
-                    const Text('• Fecha de desarrollo: 2024', style: TextStyle(fontSize: 14)),
+                    const Text('• Fecha de desarrollo: 2025', style: TextStyle(fontSize: 14)),
                     const SizedBox(height: 4),
                     const Text('• Departamento: Gestión Técnica - Planta Externa', style: TextStyle(fontSize: 14)),
                     const SizedBox(height: 4),
@@ -165,20 +165,10 @@ class _AutoresPageState extends State<AutoresPage> {
                 ),
               ),
             ),
-            const SizedBox(height: 16),
-            Container(
-              width: double.infinity,
-              height: 80,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                border: Border.all(color: Colors.grey.shade300),
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
             const SizedBox(height: 20),
             const Center(
               child: Text(
-                '© 2024 - Todos los derechos reservados',
+                '© 2025 - Todos los derechos reservados',
                 style: TextStyle(fontSize: 12, color: Colors.grey, fontStyle: FontStyle.italic),
               ),
             ),
