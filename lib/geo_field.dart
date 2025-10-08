@@ -21,7 +21,6 @@ class GeoField extends StatefulWidget {
 
 class _GeoFieldState extends State<GeoField> {
   Future<bool> _ensurePermission() async {
-    // Verificar que los servicios de ubicación estén activos
     final serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
       if (mounted) {
@@ -31,8 +30,6 @@ class _GeoFieldState extends State<GeoField> {
       }
       return false;
     }
-
-    // Verificar y solicitar permisos
     LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
@@ -92,7 +89,7 @@ class _GeoFieldState extends State<GeoField> {
 
     final LatLng initial = current != null
         ? LatLng(current.latitude, current.longitude)
-        : const LatLng(10.500000, -66.900000); // Fallback
+        : const LatLng(10.500000, -66.900000);
 
     final LatLng? picked = await showDialog<LatLng>(
       context: context,
@@ -117,8 +114,7 @@ class _GeoFieldState extends State<GeoField> {
                   ),
                   children: [
                     TileLayer(
-                      urlTemplate: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
-                      subdomains: const ['a', 'b', 'c', 'd'],
+                      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                       userAgentPackageName: 'com.example.planta_externa',
                     ),
                     MarkerLayer(
@@ -188,3 +184,4 @@ class _GeoFieldState extends State<GeoField> {
     );
   }
 }
+

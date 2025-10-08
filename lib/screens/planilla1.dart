@@ -13,246 +13,84 @@ import 'package:path_provider/path_provider.dart'; // Para acceso al sistema de 
 import 'package:file_picker/file_picker.dart'; // Para selección de archivos
 import 'package:flutter/services.dart'; // Para cargar assets
 import 'package:http/http.dart' as http;
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import '../data/form_data_manager.dart';
 
-/// Widget de mapa con fondo real
-class MapaConFondo extends StatefulWidget {
+/// Widget de mapa con flutter_map
+class MapaConFondo extends StatelessWidget {
   final List<Map<String, dynamic>> coordenadas;
   
   const MapaConFondo({super.key, required this.coordenadas});
   
   @override
-  State<MapaConFondo> createState() => _MapaConFondoState();
-}
-
-class _MapaConFondoState extends State<MapaConFondo> {
-  Uint8List? _mapaFondo;
-  late double _centerLat, _centerLng;
-  late int _zoom, _tileX, _tileY;
-  
-  @override
-  void initState() {
-    super.initState();
-    _calcularParametrosMapa();
-    _cargarMapaFondo();
-  }
-  
-  void _calcularParametrosMapa() {
-    final lats = widget.coordenadas.map((c) => c['lat']! as double).toList();
-    final lngs = widget.coordenadas.map((c) => c['lng']! as double).toList();
-    
-    _centerLat = lats.reduce((a, b) => a + b) / lats.length;
-    _centerLng = lngs.reduce((a, b) => a + b) / lngs.length;
-    
-    // Calcular zoom basado en el área que cubren los puntos
-    _zoom = _calcularZoomOptimo(lats, lngs);
-    
-    _tileX = _lngToTileX(_centerLng, _zoom);
-    _tileY = _latToTileY(_centerLat, _zoom);
-  }
-  
-  int _calcularZoomOptimo(List<double> lats, List<double> lngs) {
-    if (widget.coordenadas.length == 1) return 12;
-    
-    final minLat = lats.reduce((a, b) => a < b ? a : b);
-    final maxLat = lats.reduce((a, b) => a > b ? a : b);
-    final minLng = lngs.reduce((a, b) => a < b ? a : b);
-    final maxLng = lngs.reduce((a, b) => a > b ? a : b);
-    
-    final latDiff = maxLat - minLat;
-    final lngDiff = maxLng - minLng;
-    final maxDiff = math.max(latDiff, lngDiff);
-    
-    // Zoom ajustado ligeramente
-    if (maxDiff > 0.15) return 8;      // Área muy grande
-    if (maxDiff > 0.08) return 9;      // Área grande
-    if (maxDiff > 0.04) return 10;     // Área mediana
-    if (maxDiff > 0.015) return 11;    // Área pequeña
-    return 12;                         // Puntos cercanos
-  }
-  
-  Future<void> _cargarMapaFondo() async {
-    if (widget.coordenadas.isEmpty) return;
-    
-    try {
-      final url = 'https://tile.openstreetmap.org/$_zoom/$_tileX/$_tileY.png';
-      final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 5));
-      if (response.statusCode == 200 && mounted) {
-        setState(() {
-          _mapaFondo = response.bodyBytes;
-        });
-      }
-    } catch (_) {}
-  }
-  
-  int _lngToTileX(double lng, int zoom) {
-    return ((lng + 180.0) / 360.0 * (1 << zoom)).floor();
-  }
-  
-  int _latToTileY(double lat, int zoom) {
-    final latRad = lat * math.pi / 180.0;
-    return ((1.0 - math.log(math.tan(latRad) + 1.0 / math.cos(latRad)) / math.pi) / 2.0 * (1 << zoom)).floor();
-  }
-  
-  // Convierte coordenadas geográficas a píxeles centrado en el punto medio
-  Offset coordToPixel(double lat, double lng, Size size) {
-    final tileSize = 256.0;
-    final scale = 1 << _zoom;
-    
-    // Convertir coordenadas del punto a coordenadas mundiales
-    final worldX = (lng + 180.0) / 360.0 * scale;
-    final latRad = lat * math.pi / 180.0;
-    final worldY = (1.0 - math.log(math.tan(latRad) + 1.0 / math.cos(latRad)) / math.pi) / 2.0 * scale;
-    
-    // Convertir centro del mapa a coordenadas mundiales
-    final centerWorldX = (_centerLng + 180.0) / 360.0 * scale;
-    final centerLatRad = _centerLat * math.pi / 180.0;
-    final centerWorldY = (1.0 - math.log(math.tan(centerLatRad) + 1.0 / math.cos(centerLatRad)) / math.pi) / 2.0 * scale;
-    
-    // Calcular offset desde el centro
-    final offsetX = (worldX - centerWorldX) * tileSize;
-    final offsetY = (worldY - centerWorldY) * tileSize;
-    
-    // Posicionar relativo al centro del widget
-    final pixelX = size.width / 2 + offsetX;
-    final pixelY = size.height / 2 + offsetY;
-    
-    return Offset(pixelX, pixelY);
-  }
-  
-  // Calcula estadísticas de coordenadas
-  Map<String, double> get estadisticasCoordenadas {
-    final lats = widget.coordenadas.map((c) => c['lat']! as double).toList();
-    final lngs = widget.coordenadas.map((c) => c['lng']! as double).toList();
-    
-    final sumaLat = lats.reduce((a, b) => a + b);
-    final sumaLng = lngs.reduce((a, b) => a + b);
-    final puntoMedioLat = sumaLat / lats.length;
-    final puntoMedioLng = sumaLng / lngs.length;
-    
-    return {
-      'sumaLat': sumaLat,
-      'sumaLng': sumaLng,
-      'puntoMedioLat': puntoMedioLat,
-      'puntoMedioLng': puntoMedioLng,
-      'totalPuntos': lats.length.toDouble(),
-    };
-  }
-  
-  // Obtiene los bytes de la imagen del mapa para exportar
-  Uint8List? get mapaImagenBytes => _mapaFondo;
-  
-  @override
   Widget build(BuildContext context) {
+    if (coordenadas.isEmpty) {
+      return Container(
+        height: 300,
+        decoration: BoxDecoration(border: Border.all(color: Colors.grey)),
+        child: const Center(child: Text('No hay coordenadas para mostrar')),
+      );
+    }
+    
+    final points = coordenadas.map((c) => LatLng(c['lat']! as double, c['lng']! as double)).toList();
+    
+    final markers = coordenadas.map((coord) {
+      return Marker(
+        point: LatLng(coord['lat']! as double, coord['lng']! as double),
+        width: 30,
+        height: 30,
+        child: Container(
+          decoration: const BoxDecoration(
+            color: Colors.red,
+            shape: BoxShape.circle,
+          ),
+          child: Center(
+            child: Text(
+              '${coord['poste']}',
+              style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ),
+      );
+    }).toList();
+    
     return Container(
       height: 300,
       decoration: BoxDecoration(border: Border.all(color: Colors.grey)),
-      child: Stack(
+      child: FlutterMap(
+        options: MapOptions(
+          initialCenter: points.length == 1
+              ? points.first
+              : LatLng(
+                  points.map((p) => p.latitude).reduce((a, b) => a + b) / points.length,
+                  points.map((p) => p.longitude).reduce((a, b) => a + b) / points.length,
+                ),
+          initialZoom: points.length == 1 ? 13.0 : 12.0,
+        ),
         children: [
-          if (_mapaFondo != null)
-            Positioned.fill(
-              child: Image.memory(_mapaFondo!, fit: BoxFit.cover),
-            )
-          else
-            Container(
-              color: Colors.grey[200],
-              child: const Center(
-                child: CircularProgressIndicator(),
-              ),
-            ),
-          Positioned.fill(
-            child: CustomPaint(
-              painter: RutaPainter(widget.coordenadas, coordToPixel),
-            ),
+          TileLayer(
+            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+            userAgentPackageName: 'com.example.planta_externa',
           ),
-          // Mostrar estadísticas de coordenadas
-          Positioned(
-            top: 5,
-            left: 5,
-            child: Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: Colors.black54,
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Punto medio: ${estadisticasCoordenadas['puntoMedioLat']!.toStringAsFixed(6)}, ${estadisticasCoordenadas['puntoMedioLng']!.toStringAsFixed(6)}',
-                    style: const TextStyle(color: Colors.white, fontSize: 10),
-                  ),
-                  Text(
-                    'Puntos: ${estadisticasCoordenadas['totalPuntos']!.toInt()} | Zoom: $_zoom',
-                    style: const TextStyle(color: Colors.white, fontSize: 10),
-                  ),
-                ],
-              ),
+          if (points.length > 1)
+            PolylineLayer(
+              polylines: [
+                Polyline(
+                  points: points,
+                  color: Colors.red,
+                  strokeWidth: 3,
+                ),
+              ],
             ),
-          ),
+          MarkerLayer(markers: markers),
         ],
       ),
     );
   }
 }
 
-/// Painter solo para la ruta y marcadores
-class RutaPainter extends CustomPainter {
-  final List<Map<String, dynamic>> coordenadas;
-  final Offset Function(double lat, double lng, Size size) coordToPixel;
-  
-  RutaPainter(this.coordenadas, this.coordToPixel);
-  
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (coordenadas.isEmpty) return;
-    
-    // Dibujar líneas entre puntos
-    if (coordenadas.length > 1) {
-      final linePaint = Paint()
-        ..color = Colors.red
-        ..strokeWidth = 3
-        ..style = PaintingStyle.stroke;
-      
-      for (int i = 0; i < coordenadas.length - 1; i++) {
-        final start = coordToPixel(coordenadas[i]['lat'], coordenadas[i]['lng'], size);
-        final end = coordToPixel(coordenadas[i + 1]['lat'], coordenadas[i + 1]['lng'], size);
-        canvas.drawLine(start, end, linePaint);
-      }
-    }
-    
-    // Dibujar marcadores
-    final markerPaint = Paint()..color = Colors.red;
-    final borderPaint = Paint()
-      ..color = Colors.white
-      ..strokeWidth = 2
-      ..style = PaintingStyle.stroke;
-    final textPainter = TextPainter(
-      textDirection: TextDirection.ltr,
-      textAlign: TextAlign.center,
-    );
-    
-    for (final coord in coordenadas) {
-      final point = coordToPixel(coord['lat'], coord['lng'], size);
-      
-      // Dibujar círculo con borde blanco
-      canvas.drawCircle(point, 10, markerPaint);
-      canvas.drawCircle(point, 10, borderPaint);
-      
-      // Dibujar número del poste
-      textPainter.text = TextSpan(
-        text: '${coord['poste']}',
-        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-      );
-      textPainter.layout();
-      textPainter.paint(canvas, Offset(point.dx - textPainter.width / 2, point.dy - textPainter.height / 2));
-    }
-  }
-  
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
-}
+
 
 /// Widget wrapper que contiene el formulario principal
 class FormularioPage extends StatelessWidget {
@@ -468,6 +306,19 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
         zoom = 13;
       }
       
+      /// Calcula las coordenadas X e Y de la tesela (tile) en un mapa tipo Web Mercator.
+      ///
+      /// - `centerLng`: Longitud central en grados.
+      /// - `centerLat`: Latitud central en grados.
+      /// - `zoom`: Nivel de zoom del mapa.
+      ///
+      /// El cálculo de `tileX` convierte la longitud en una posición horizontal de tesela.
+      /// El cálculo de `tileY` convierte la latitud en una posición vertical de tesela,
+      /// utilizando la proyección Web Mercator, que transforma la latitud a radianes y
+      /// aplica funciones trigonométricas y logarítmicas para ajustar la escala.
+      ///
+      /// Ambos valores se ajustan al nivel de zoom usando desplazamiento de bits (`1 << zoom`)
+      /// y se redondean hacia abajo con `.floor()`.
       final tileX = ((centerLng + 180.0) / 360.0 * (1 << zoom)).floor();
       final latRad = centerLat * math.pi / 180.0;
       final tileY = ((1.0 - math.log(math.tan(latRad) + 1.0 / math.cos(latRad)) / math.pi) / 2.0 * (1 << zoom)).floor();
@@ -1246,7 +1097,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                         pw.SizedBox(height: 16),
                       ],
                     );
-                  }),
+                 }),
 
                   ],
                 ),
