@@ -1,10 +1,12 @@
 // Importaciones necesarias para el formulario de auditoría
 // ignore_for_file: use_build_context_synchronously
 
+
+
 import 'package:flutter/material.dart';
 import 'package:pdf/widgets.dart' as pw; // Para generar PDFs
 import 'package:pdf/pdf.dart';
-import 'package:printing/printing.dart'; // Para imprimir/exportar PDFs
+import 'package:printing/printing.dart'; // Para imprimir/exportar PDFs Widget personalizado para geolocalización
 import 'package:planta_externa/geo_field.dart'; // Widget personalizado para geolocalización
 import 'dart:io';
 import 'dart:convert'; // Para JSON
@@ -13,9 +15,13 @@ import 'package:path_provider/path_provider.dart'; // Para acceso al sistema de 
 import 'package:file_picker/file_picker.dart'; // Para selección de archivos
 import 'package:flutter/services.dart'; // Para cargar assets
 import 'package:http/http.dart' as http;
-import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_map/flutter_map.dart' show FlutterMap, MapOptions, Marker, MarkerLayer, Polyline, PolylineLayer, TileLayer;
 import 'package:latlong2/latlong.dart';
 import '../data/form_data_manager.dart';
+import 'dart:typed_data'; // Para Uint8List
+
+/// Calcula la distancia entre dos puntos (Haversine, en metros)
+
 
 /// Widget de mapa con flutter_map
 class MapaConFondo extends StatelessWidget {
@@ -109,6 +115,28 @@ class FormularioPlantaExterna extends StatefulWidget {
 }
 
 class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
+  // Campo para correcto etiquetado
+  String _correctoEtiquetado = 'Si';
+  /// Calcula la distancia entre dos puntos (Haversine, en metros)
+  double _haversine(double lat1, double lon1, double lat2, double lon2) {
+    const R = 6371000.0; // Radio de la Tierra en metros
+    final dLat = _deg2rad(lat2 - lat1);
+    final dLon = _deg2rad(lon2 - lon1);
+    final a =
+        math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(_deg2rad(lat1)) * math.cos(_deg2rad(lat2)) *
+        math.sin(dLon / 2) * math.sin(dLon / 2);
+    final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+    return R * c;
+  }
+
+
+
+
+
+
+  double _deg2rad(double deg) => deg * math.pi / 180.0;
+
   // === VARIABLES DE CONTROL ===
   final _formKey = GlobalKey<FormState>(); // Clave para validación del formulario
   final List<Map<String, dynamic>> _tabla = []; // Lista que almacena todas las filas de datos
@@ -250,7 +278,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
     return MapaConFondo(coordenadas: coordenadas);
   }
   
-  /// Genera imagen del mapa para PDF
+  /// Genera imagen del mapa para PDF (usa staticmap.openstreetmap.de con path y marcadores)
   Future<Uint8List?> _generarImagenMapaParaPDF() async {
     final coordenadas = <Map<String, dynamic>>[];
     for (final fila in _tabla) {
@@ -267,72 +295,77 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
         }
       }
     }
-    
+
     if (coordenadas.isEmpty) return null;
-    
-    // Crear widget temporal para obtener la imagen
-    final mapaWidget = MapaConFondo(coordenadas: coordenadas);
-    
-    // Simular la misma lógica del widget para obtener la imagen de fondo
+
+    // --- SUGERENCIA: muestreo automático de puntos si hay demasiados ---
+    List<Map<String, dynamic>> sampledCoords = coordenadas;
+    const int maxPoints = 60; // Limitar a 60 puntos para la URL
+    if (coordenadas.length > maxPoints) {
+      // Muestreo equidistante
+      double step = coordenadas.length / maxPoints;
+      sampledCoords = List.generate(maxPoints, (i) => coordenadas[(i * step).floor()]);
+    }
+
     try {
-      final lats = coordenadas.map((c) => c['lat']! as double).toList();
-      final lngs = coordenadas.map((c) => c['lng']! as double).toList();
+      final lats = sampledCoords.map((c) => c['lat']! as double).toList();
+      final lngs = sampledCoords.map((c) => c['lng']! as double).toList();
       final centerLat = lats.reduce((a, b) => a + b) / lats.length;
       final centerLng = lngs.reduce((a, b) => a + b) / lngs.length;
-      
-      // Calcular zoom usando la misma lógica
+
+      // Calcular zoom aproximado en base al extent (ajusta según necesidad)
       final minLat = lats.reduce((a, b) => a < b ? a : b);
       final maxLat = lats.reduce((a, b) => a > b ? a : b);
       final minLng = lngs.reduce((a, b) => a < b ? a : b);
       final maxLng = lngs.reduce((a, b) => a > b ? a : b);
       final latDiff = maxLat - minLat;
       final lngDiff = maxLng - minLng;
-      final maxDiff = math.max(latDiff, lngDiff);
-      
+      final maxDiff = math.max(latDiff.abs(), lngDiff.abs());
+
       int zoom;
-      if (coordenadas.length == 1) {
+      if (sampledCoords.length == 1) {
         zoom = 13;
-      } else if (maxDiff > 0.2) {
+      } else if (maxDiff > 10) {
+        zoom = 3;
+      } else if (maxDiff > 5) {
+        zoom = 4;
+      } else if (maxDiff > 2) {
+        zoom = 6;
+      } else if (maxDiff > 1) {
         zoom = 8;
-      } else if (maxDiff > 0.1) {
+      } else if (maxDiff > 0.5) {
         zoom = 9;
-      } else if (maxDiff > 0.05) {
+      } else if (maxDiff > 0.2) {
         zoom = 10;
-      } else if (maxDiff > 0.02) {
+      } else if (maxDiff > 0.1) {
         zoom = 11;
-      } else if (maxDiff > 0.01) {
+      } else if (maxDiff > 0.02) {
         zoom = 12;
       } else {
         zoom = 13;
       }
-      
-      /// Calcula las coordenadas X e Y de la tesela (tile) en un mapa tipo Web Mercator.
-      ///
-      /// - `centerLng`: Longitud central en grados.
-      /// - `centerLat`: Latitud central en grados.
-      /// - `zoom`: Nivel de zoom del mapa.
-      ///
-      /// El cálculo de `tileX` convierte la longitud en una posición horizontal de tesela.
-      /// El cálculo de `tileY` convierte la latitud en una posición vertical de tesela,
-      /// utilizando la proyección Web Mercator, que transforma la latitud a radianes y
-      /// aplica funciones trigonométricas y logarítmicas para ajustar la escala.
-      ///
-      /// Ambos valores se ajustan al nivel de zoom usando desplazamiento de bits (`1 << zoom`)
-      /// y se redondean hacia abajo con `.floor()`.
-      final tileX = ((centerLng + 180.0) / 360.0 * (1 << zoom)).floor();
-      final latRad = centerLat * math.pi / 180.0;
-      final tileY = ((1.0 - math.log(math.tan(latRad) + 1.0 / math.cos(latRad)) / math.pi) / 2.0 * (1 << zoom)).floor();
-      
-      final url = 'https://tile.openstreetmap.org/$zoom/$tileX/$tileY.png';
-      final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
-      
+
+      // Construir path (traza) y marcadores
+      final pathString = sampledCoords.map((c) => '${c['lat']},${c['lng']}').join('|');
+      final pathParam = 'color:0xff0000|weight:3|$pathString';
+      final markersParams = sampledCoords.map((c) => 'markers=${c['lat']},${c['lng']},red-pushpin').join('&');
+
+      final int width = 1000;
+      final int height = 500;
+
+      final url =
+          'https://staticmap.openstreetmap.de/staticmap.php?center=$centerLat,$centerLng&zoom=$zoom&size=${width}x$height&maptype=mapnik&$markersParams&path=${Uri.encodeComponent(pathParam)}';
+
+      final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 12));
       if (response.statusCode == 200) {
         return response.bodyBytes;
+      } else {
+        print('Error al obtener static map: ${response.statusCode}');
       }
     } catch (e) {
       print('Error generando imagen de mapa para PDF: $e');
     }
-    
+
     return null;
   }
 
@@ -727,7 +760,8 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
         _observacionesController.text = fila['observaciones'];
         _trabajosPendientesController.text = fila['trabajosPendientes'];
         _yk01Controller.text = fila['yk01'] ?? '';
-        _nomenclaturaElementoController.text = fila['nomenclaturaElemento'] ?? '';
+  _nomenclaturaElementoController.text = fila['nomenclaturaElemento'] ?? '';
+  _correctoEtiquetado = fila['correctoEtiquetado'] ?? 'Si';
         if (_tipoCable == '4 Hilos') {
           final l1550 = List<String>.from(fila['medicionesPuertos1550'] ?? []);
           final l1490 = List<String>.from(fila['medicionesPuertos1490'] ?? []);
@@ -1097,7 +1131,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                         pw.SizedBox(height: 16),
                       ],
                     );
-                 }),
+                }),
 
                   ],
                 ),
@@ -1112,12 +1146,36 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
     // Página de mapa de ruta (siempre se muestra si hay datos)
     if (_tabla.isNotEmpty) {
       final mapaBytes = await _generarImagenMapaParaPDF();
-      final coordenadasValidas = _tabla.where((fila) => 
-        fila['geolocalizacionElemento'] != null && 
+      final coordenadasValidas = _tabla.where((fila) =>
+        fila['geolocalizacionElemento'] != null &&
         fila['geolocalizacionElemento'].toString().isNotEmpty &&
         fila['geolocalizacionElemento'].toString().contains(',')
-      ).toList();
-      
+      ).map((fila) {
+        final parts = fila['geolocalizacionElemento'].toString().split(',');
+        if (parts.length >= 2) {
+          final lat = double.tryParse(parts[0].trim());
+          final lng = double.tryParse(parts[1].trim());
+          if (lat != null && lng != null) {
+            return {'lat': lat, 'lng': lng};
+          }
+        }
+        return null;
+      }).where((c) => c != null).cast<Map<String, double>>().toList();
+
+      // Calcular distancia total usando Haversine
+      double totalDistanciaMetros = 0.0;
+      for (int i = 1; i < coordenadasValidas.length; i++) {
+        final a = coordenadasValidas[i - 1];
+        final b = coordenadasValidas[i];
+        totalDistanciaMetros += _haversine(a['lat']!, a['lng']!, b['lat']!, b['lng']!);
+      }
+      String distanciaStr;
+      if (totalDistanciaMetros >= 1000) {
+        distanciaStr = (totalDistanciaMetros / 1000).toStringAsFixed(2) + ' km';
+      } else {
+        distanciaStr = totalDistanciaMetros.toStringAsFixed(0) + ' m';
+      }
+
       pdf.addPage(
         pw.Page(
           pageFormat: PdfPageFormat.letter,
@@ -1141,21 +1199,32 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                       width: double.infinity,
                       height: 300,
                       decoration: pw.BoxDecoration(border: pw.Border.all()),
-                      child: pw.Center(
-                        child: pw.Column(
-                          mainAxisAlignment: pw.MainAxisAlignment.center,
-                          children: [
-                            pw.Text('Mapa de Ruta', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
-                            pw.SizedBox(height: 8),
-                            pw.Text('Coordenadas válidas: ${coordenadasValidas.length}', style: const pw.TextStyle(fontSize: 12)),
-                            pw.Text('Total de postes: ${_tabla.length}', style: const pw.TextStyle(fontSize: 12)),
-                            pw.SizedBox(height: 8),
-                            pw.Text('Ver previsualización en la aplicación', style: const pw.TextStyle(fontSize: 10)),
-                          ],
-                        ),
-                      ),
+                      child: mapaBytes != null
+                          ? pw.Center(
+                              child: pw.Image(
+                                pw.MemoryImage(mapaBytes),
+                                width: 520,
+                                height: 300,
+                                fit: pw.BoxFit.contain,
+                              ),
+                            )
+                          : pw.Center(
+                              child: pw.Column(
+                                mainAxisAlignment: pw.MainAxisAlignment.center,
+                                children: [
+                                  pw.Text('Mapa de Ruta', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+                                  pw.SizedBox(height: 8),
+                                  pw.Text('Coordenadas válidas: ${coordenadasValidas.length}', style: const pw.TextStyle(fontSize: 12)),
+                                  pw.Text('Total de postes: ${_tabla.length}', style: const pw.TextStyle(fontSize: 12)),
+                                  pw.SizedBox(height: 8),
+                                  pw.Text('Ver previsualización en la aplicación', style: const pw.TextStyle(fontSize: 10)),
+                                ],
+                              ),
+                            ),
                     ),
-                    pw.SizedBox(height: 16),
+                    pw.SizedBox(height: 12),
+                    pw.Text('Distancia total recorrida: $distanciaStr', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: PdfColors.blue)),
+                    pw.SizedBox(height: 12),
                     pw.Text('Postes inspeccionados:', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
                     pw.SizedBox(height: 8),
                     pw.Table(
@@ -1165,13 +1234,15 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                           children: [
                             pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text('Nro Poste', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10))),
                             pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text('Geolocalización', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10))),
+                            pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text('Correcto etiquetado', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10))),
                           ],
                         ),
-                        ..._tabla.map((fila) => 
+                        ..._tabla.map((fila) =>
                           pw.TableRow(
                             children: [
                               pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text('${fila['contador']}', style: const pw.TextStyle(fontSize: 9))),
                               pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text('${fila['geolocalizacionElemento'] ?? 'Sin coordenadas'}', style: const pw.TextStyle(fontSize: 9))),
+                              pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text('${fila['correctoEtiquetado'] ?? 'Si'}', style: const pw.TextStyle(fontSize: 9))),
                             ],
                           )
                         ).toList(),
@@ -1328,6 +1399,11 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                       _buildTextField('Nomenclatura CL', _nomenclaturaElementoController),
                     if (_tipoElemento == 'FDT')
                       _buildTextField('Nomenclatura FDT', _nomenclaturaElementoController),
+                    _buildDropdownField('Correcto etiquetado', _correctoEtiquetado, ['Si', 'No'], (val) {
+                      setState(() {
+                        _correctoEtiquetado = val ?? 'Si';
+                      });
+                    }),
                     _buildDropdownField('Elemento de fijación', _elementoFijacion, _opcionesElementoFijacion, (val) {
                       setState(() { _elementoFijacion = val!; });
                     }),

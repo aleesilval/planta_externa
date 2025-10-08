@@ -89,6 +89,8 @@ class _Planilla3PageState extends State<Planilla3Page> {
     '3502040': 'FIBRA 12 HILOS ADSS ARAMIDA YARN SIN GLASS YARN',
     '3502043': 'PEDESTAL PARA NAP 16 PUERTOS INCLUYE ACC DE FIJACION',
     '3502053': 'TENSOR FIBRA PLANA PLASTICO',
+    '1911006': 'TERMOCONTRAIBLES DESARTICULADOS P/FUSION DE F.O.',
+    '1931001': 'PRECINTO SUJETADOR DE FIBRA OPTICA',
   };
 
   @override
@@ -405,54 +407,59 @@ class _Planilla3PageState extends State<Planilla3Page> {
     
     // Página 5: Evidencia fotográfica
     if (_evidenciaFotografica.isNotEmpty) {
-      pdf.addPage(
-        pw.Page(
-          build: (pw.Context context) {
-            return pw.Stack(
-              children: [
-                if (logoImage != null)
-                  pw.Center(
-                    child: pw.Opacity(
-                      opacity: 0.1,
-                      child: pw.Image(logoImage, width: 300, height: 300),
+      const int fotosPorPagina = 2;
+      final fotos = _evidenciaFotografica;
+      for (int i = 0; i < fotos.length; i += fotosPorPagina) {
+        final fotosPagina = fotos.sublist(i, (i + fotosPorPagina > fotos.length) ? fotos.length : i + fotosPorPagina);
+        pdf.addPage(
+          pw.Page(
+            build: (pw.Context context) {
+              return pw.Stack(
+                children: [
+                  if (logoImage != null)
+                    pw.Center(
+                      child: pw.Opacity(
+                        opacity: 0.1,
+                        child: pw.Image(logoImage, width: 300, height: 300),
+                      ),
                     ),
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text('Evidencia Fotográfica', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+                      pw.SizedBox(height: 16),
+                      ...fotosPagina.map((foto) {
+                        final bytes = foto['bytes'] as Uint8List?;
+                        return pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            if (bytes != null)
+                              pw.Container(
+                                height: 200,
+                                width: double.infinity,
+                                child: pw.Image(pw.MemoryImage(bytes)),
+                              )
+                            else
+                              pw.Container(
+                                height: 200,
+                                width: double.infinity,
+                                decoration: pw.BoxDecoration(border: pw.Border.all()),
+                                child: pw.Center(child: pw.Text('Sin imagen disponible')),
+                              ),
+                            pw.SizedBox(height: 8),
+                            pw.Text('Descripción: ${foto['descripcion']}'),
+                            pw.SizedBox(height: 16),
+                          ],
+                        );
+                      }),
+                    ],
                   ),
-                pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Text('Evidencia Fotográfica', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
-                    pw.SizedBox(height: 16),
-                    ..._evidenciaFotografica.asMap().entries.map((entry) {
-                      final bytes = entry.value['bytes'] as Uint8List?;
-                      return pw.Column(
-                        crossAxisAlignment: pw.CrossAxisAlignment.start,
-                        children: [
-                          if (bytes != null)
-                            pw.Container(
-                              height: 200,
-                              width: double.infinity,
-                              child: pw.Image(pw.MemoryImage(bytes)),
-                            )
-                          else
-                            pw.Container(
-                              height: 200,
-                              width: double.infinity,
-                              decoration: pw.BoxDecoration(border: pw.Border.all()),
-                              child: pw.Center(child: pw.Text('Sin imagen disponible')),
-                            ),
-                          pw.SizedBox(height: 8),
-                          pw.Text('Descripción: ${entry.value['descripcion']}'),
-                          pw.SizedBox(height: 16),
-                        ],
-                      );
-                    }),
-                  ],
-                ),
-              ],
-            );
-          },
-        ),
-      );
+                ],
+              );
+            },
+          ),
+        );
+      }
     }
 
       await Printing.layoutPdf(
@@ -473,24 +480,24 @@ class _Planilla3PageState extends State<Planilla3Page> {
   
   Future<void> _adjuntarFoto() async {
     FilePickerResult? result = await FilePicker.platform.pickFiles(
-      allowMultiple: false,
+      allowMultiple: true,
       type: FileType.image,
     );
     if (result != null && _descripcionFotoController.text.isNotEmpty) {
-      final file = result.files.first;
-      Uint8List? bytes = file.bytes;
-      // Load bytes from path if not available
-      if (bytes == null && file.path != null) {
-        bytes = await File(file.path!).readAsBytes();
-      }
-      setState(() {
-        _evidenciaFotografica.add({
-          'foto': file,
-          'bytes': bytes,
-          'descripcion': _descripcionFotoController.text,
+      for (final file in result.files) {
+        Uint8List? bytes = file.bytes;
+        if (bytes == null && file.path != null) {
+          bytes = await File(file.path!).readAsBytes();
+        }
+        setState(() {
+          _evidenciaFotografica.add({
+            'foto': file,
+            'bytes': bytes,
+            'descripcion': _descripcionFotoController.text,
+          });
         });
-        _descripcionFotoController.clear();
-      });
+      }
+      _descripcionFotoController.clear();
     } else if (_descripcionFotoController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Por favor ingrese una descripción')),
@@ -764,43 +771,48 @@ class _Planilla3PageState extends State<Planilla3Page> {
     
     // Página 5: Evidencia fotográfica
     if (_evidenciaFotografica.isNotEmpty) {
-      pdf.addPage(
-        pw.Page(
-          build: (pw.Context context) {
-            return pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Text('Evidencia Fotográfica', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
-                pw.SizedBox(height: 16),
-                ..._evidenciaFotografica.asMap().entries.map((entry) {
-                  final bytes = entry.value['bytes'] as Uint8List?;
-                  return pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      if (bytes != null)
-                        pw.Container(
-                          height: 200,
-                          width: double.infinity,
-                          child: pw.Image(pw.MemoryImage(bytes)),
-                        )
-                      else
-                        pw.Container(
-                          height: 200,
-                          width: double.infinity,
-                          decoration: pw.BoxDecoration(border: pw.Border.all()),
-                          child: pw.Center(child: pw.Text('Sin imagen disponible')),
-                        ),
-                      pw.SizedBox(height: 8),
-                      pw.Text('Descripción: ${entry.value['descripcion']}'),
-                      pw.SizedBox(height: 16),
-                    ],
-                  );
-                }),
-              ],
-            );
-          },
-        ),
-      );
+      const int fotosPorPagina = 2;
+      final fotos = _evidenciaFotografica;
+      for (int i = 0; i < fotos.length; i += fotosPorPagina) {
+        final fotosPagina = fotos.sublist(i, (i + fotosPorPagina > fotos.length) ? fotos.length : i + fotosPorPagina);
+        pdf.addPage(
+          pw.Page(
+            build: (pw.Context context) {
+              return pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text('Evidencia Fotográfica', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+                  pw.SizedBox(height: 16),
+                  ...fotosPagina.map((foto) {
+                    final bytes = foto['bytes'] as Uint8List?;
+                    return pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        if (bytes != null)
+                          pw.Container(
+                            height: 200,
+                            width: double.infinity,
+                            child: pw.Image(pw.MemoryImage(bytes)),
+                          )
+                        else
+                          pw.Container(
+                            height: 200,
+                            width: double.infinity,
+                            decoration: pw.BoxDecoration(border: pw.Border.all()),
+                            child: pw.Center(child: pw.Text('Sin imagen disponible')),
+                          ),
+                        pw.SizedBox(height: 8),
+                        pw.Text('Descripción: ${foto['descripcion']}'),
+                        pw.SizedBox(height: 16),
+                      ],
+                    );
+                  }),
+                ],
+              );
+            },
+          ),
+        );
+      }
     }
     
     return pdf;

@@ -2,12 +2,30 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:pdf/pdf.dart';
 // ignore: unused_import
 import 'package:printing/printing.dart';
 
 import 'package:flutter/services.dart';
+import 'dart:typed_data';
+import 'dart:io';
 import 'report_logic.dart';
 import '../data/form_data_manager.dart';
+
+// Clase auxiliar para foto con descripción
+class _FotoDescripcion {
+  final String seccion;
+  final String nombre;
+  final String descripcion;
+  final Uint8List? bytes;
+  
+  _FotoDescripcion({
+    required this.seccion,
+    required this.nombre,
+    required this.descripcion,
+    required this.bytes,
+  });
+}
 
 class ReportGeneratorScreen extends StatefulWidget {
   const ReportGeneratorScreen({super.key});
@@ -688,6 +706,9 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
     if (mounted) setState(() => _generando = true);
 
     try {
+      // Generar el PDF completo con fotos
+      final pdf = await _generarPDF(incluirFotos: true);
+      
       final success = await generateAndCompressReport(
         instalador: _tecnicoController.text,
         fecha: _fechaActual,
@@ -702,6 +723,7 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
         archivoOtdr: _archivoOtdr,
         context: context,
         savePath: selectedDirectory,
+        pdfDocument: pdf,
       );
 
       if (mounted) {
@@ -960,49 +982,163 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
       );
     }
     
-    if (incluirFotos) {
-      pdf.addPage(
-        pw.Page(
-          build: (pw.Context context) {
-            return pw.Stack(
-              children: [
-                // Marca de agua centrada
-                if (logoImage != null)
-                  pw.Center(
-                    child: pw.Opacity(
-                      opacity: 0.1,
-                      child: pw.Image(logoImage, width: 300, height: 300),
-                    ),
+    if (incluirFotos && _fotosPorSeccion.isNotEmpty) {
+      // Soporte fotográfico: imágenes ordenadas por sección
+      for (final entry in _fotosPorSeccion.entries) {
+        final seccion = entry.key;
+        final fotos = entry.value;
+        
+        for (int i = 0; i < fotos.length; i++) {
+          try {
+            final foto = fotos[i];
+            Uint8List? imageBytes;
+            
+            // Obtener los bytes de la imagen
+            if (foto.bytes != null) {
+              imageBytes = foto.bytes;
+            } else if (foto.path != null) {
+              imageBytes = await File(foto.path!).readAsBytes();
+            }
+            
+            if (imageBytes != null) {
+              pdf.addPage(
+                pw.Page(
+                  build: (pw.Context context) {
+                    return pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Row(
+                          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                          children: [
+                            pw.Column(
+                              crossAxisAlignment: pw.CrossAxisAlignment.start,
+                              children: [
+                                pw.Text('Soporte fotográfico', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+                                pw.SizedBox(height: 4),
+                                pw.Text('Sección: $seccion', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                                pw.Text('Foto ${i + 1} de ${fotos.length}', style: const pw.TextStyle(fontSize: 10)),
+                              ],
+                            ),
+                            if (logoImage != null)
+                              pw.Opacity(
+                                opacity: 0.3,
+                                child: pw.Image(logoImage, width: 60, height: 60),
+                              ),
+                          ],
+                        ),
+                        pw.SizedBox(height: 16),
+                        pw.Expanded(
+                          child: pw.Center(
+                            child: pw.Image(
+                              pw.MemoryImage(imageBytes!),
+                              fit: pw.BoxFit.contain,
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              );
+            }
+          } catch (e) {
+            debugPrint('Error al agregar foto: $e');
+          }
+        }
+      }
+
+      // OTDR PDF: integrar páginas del PDF cargado
+      if (_archivoOtdr != null) {
+        try {
+          // Leer el PDF OTDR
+          Uint8List otdrBytes;
+          if (_archivoOtdr!.bytes != null) {
+            otdrBytes = _archivoOtdr!.bytes!;
+          } else if (_archivoOtdr!.path != null) {
+            otdrBytes = await File(_archivoOtdr!.path!).readAsBytes();
+          } else {
+            throw Exception('No se puede leer el archivo OTDR');
+          }
+          
+          // Agregar página de separación
+          pdf.addPage(
+            pw.Page(
+              build: (pw.Context context) {
+                return pw.Center(
+                  child: pw.Column(
+                    mainAxisAlignment: pw.MainAxisAlignment.center,
+                    children: [
+                      pw.Text(
+                        'Trazas OTDR',
+                        style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold),
+                      ),
+                      pw.SizedBox(height: 16),
+                      pw.Text(
+                        'A continuación se presentan las trazas OTDR',
+                        style: const pw.TextStyle(fontSize: 14),
+                      ),
+                    ],
                   ),
-                // Contenido principal
-                pw.Column(
+                );
+              },
+            ),
+          );
+
+          // Renderizar cada página del PDF OTDR como imagen
+          int pageNumber = 0;
+          await for (final page in Printing.raster(otdrBytes, dpi: 150)) {
+            try {
+              pageNumber++;
+              final imageBytes = await page.toPng();
+              
+              pdf.addPage(
+                pw.Page(
+                  pageFormat: PdfPageFormat.a4,
+                  build: (pw.Context context) {
+                    return pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text('Página OTDR $pageNumber', style: const pw.TextStyle(fontSize: 10)),
+                        pw.SizedBox(height: 8),
+                        pw.Expanded(
+                          child: pw.Center(
+                            child: pw.Image(
+                              pw.MemoryImage(imageBytes),
+                              fit: pw.BoxFit.contain,
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              );
+            } catch (e) {
+              debugPrint('Error al procesar página $pageNumber del PDF OTDR: $e');
+            }
+          }
+        } catch (e) {
+          debugPrint('Error al integrar PDF OTDR: $e');
+          // Si falla la integración, agregar página informativa
+          pdf.addPage(
+            pw.Page(
+              build: (pw.Context context) {
+                return pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                pw.Text('Fotos y Archivos Adjuntos', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
-                pw.SizedBox(height: 16),
-                ..._fotosPorSeccion.entries.map((entry) => 
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text('${entry.key}:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                      ...entry.value.asMap().entries.map((foto) => 
-                        pw.Text('• ${entry.key.replaceAll(" ", "_")}_${foto.key + 1}.${foto.value.extension}')
-                      ),
-                      pw.SizedBox(height: 8),
-                    ],
-                  )
-                ),
-                if (_archivoOtdr != null) ...[
-                  pw.Text('Trazas OTDR:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                  pw.Text('• ${_archivoOtdr!.name}'),
-                ],
-                ],
-              ),
-            ],
+                    pw.Text('Trazas OTDR', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 18)),
+                    pw.SizedBox(height: 16),
+                    pw.Text('El archivo PDF OTDR se encuentra adjunto en el ZIP como archivo separado.'),
+                    pw.Text('Nombre del archivo: ${_archivoOtdr!.name}'),
+                    pw.SizedBox(height: 8),
+                    pw.Text('Error al integrar: $e', style: const pw.TextStyle(fontSize: 10)),
+                  ],
+                );
+              }
+            ) 
           );
-        },
-      ),
-    );
+        }
+      }
     }
     
     return pdf;

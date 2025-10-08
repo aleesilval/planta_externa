@@ -1,3 +1,4 @@
 {
-    "cmake.sourceDirectory": "C:/Users/user/planta_externa/linux"
+    "cmake.sourceDirectory": "C:/Users/user/planta_externa/linux",
+    "codium.codeCompletion.enable": false
 }

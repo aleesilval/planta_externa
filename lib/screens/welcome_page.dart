@@ -101,131 +101,52 @@ class _WelcomePageState extends State<WelcomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Row(
+      body: SingleChildScrollView(
+        child: Column(
           children: [
-            Expanded(
-              child: Container(
-                height: 80,
-                child: const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'Bienvenido',
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            Padding(
+              padding: const EdgeInsets.only(top: 30, left: 16, right: 16),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text('Bienvenido', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                        SizedBox(height: 8),
+                        Text('Depto. Gestión Técnica\nPlanta Externa', style: TextStyle(fontSize: 16)),
+                        SizedBox(height: 10),
+                      ],
                     ),
-                    Text(
-                      'Depto. Gestión Técnica\nPlanta Externa',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.normal),
-                    ),
-                  ],
-                ),
+                  ),
+                  Image.asset(
+                    'assets/images/LOGO_INTER.png',
+                    height: 60,
+                    errorBuilder: (context, error, stackTrace) {
+                      return const Icon(Icons.image_not_supported, size: 60);
+                    },
+                  ),
+                ],
               ),
             ),
-            Image.asset(
-              'assets/images/LOGO_INTER.png',
-              height: 40,
-              errorBuilder: (context, error, stackTrace) {
-                return const Icon(Icons.image_not_supported, size: 40);
-              },
+            Center(
+              child: DropdownButton<int>(
+                value: _selectedPlanilla,
+                items: const [
+                  DropdownMenuItem(value: 1, child: Text('Auditoria de Mantenimiento ')),
+                  DropdownMenuItem(value: 2, child: Text('Plantilla Certificacion de red')),
+                  DropdownMenuItem(value: 3, child: Text('Informe de mantenimiento')),
+                ],
+                onChanged: (val) => setState(() => _selectedPlanilla = val ?? 1),
+              ),
             ),
-          ],
-        ),
-      ),
-      body: SingleChildScrollView(
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-            const Text(
-              'Seleccione la planilla a utilizar',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 20),
-            DropdownButton<int>(
-              value: _selectedPlanilla,
-              items: const [
-                DropdownMenuItem(value: 1, child: Text('Auditoria de Mantenimiento ')),
-                DropdownMenuItem(value: 2, child: Text('Plantilla Certificacion de red')),
-                DropdownMenuItem(value: 3, child: Text('Informe de mantenimiento')),
-              ],
-              onChanged: (val) => setState(() => _selectedPlanilla = val ?? 1),
-            ),
-            const SizedBox(height: 40),
+            const SizedBox(height: 30),
             ElevatedButton(
               onPressed: () => _navigateToPlanilla(context),
               child: const Text('Ir a la planilla'),
             ),
-            const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.folder_open),
-                  label: const Text('Configurar Ruta'),
-                  onPressed: _configureSavePath,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue[100],
-                    foregroundColor: Colors.blue[800],
-                  ),
-                ),
-                const SizedBox(width: 16),
-                ElevatedButton.icon(
-                  icon: _obteniendoUbicacion 
-                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Icons.location_on),
-                  label: const Text('Obtener Ubicación'),
-                  onPressed: _obteniendoUbicacion ? null : _obtenerUbicacion,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green[100],
-                    foregroundColor: Colors.green[800],
-                  ),
-                ),
-              ],
-            ),
-            if (_savePath != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                'Ruta actual: $_savePath',
-                style: const TextStyle(fontSize: 12, color: Colors.grey),
-                textAlign: TextAlign.center,
-              ),
-            ],
-            if (_ubicacionActual != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                'Ubicación: ${_ubicacionActual!.latitude.toStringAsFixed(6)}, ${_ubicacionActual!.longitude.toStringAsFixed(6)}',
-                style: const TextStyle(fontSize: 12, color: Colors.grey),
-                textAlign: TextAlign.center,
-              ),
-            ],
-
-            const SizedBox(height: 8),
-            const Text(
-              'Alejandro Silva',
-              style: TextStyle(
-                color: Colors.grey,
-                fontSize: 12,
-              ),
-            ),
-            const Text(
-              'Edicxon Mendoza',
-              style: TextStyle(
-                color: Colors.grey,
-                fontSize: 12,
-              ),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'Versión 1.0.0 - © 2024',
-              style: TextStyle(
-                color: Colors.grey,
-                fontSize: 10,
-                fontStyle: FontStyle.italic,
-              ),
-            ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 30),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -246,22 +167,52 @@ class _WelcomePageState extends State<WelcomePage> {
                     foregroundColor: Colors.purple[800],
                   ),
                 ),
-                const SizedBox(width: 16),
-                ElevatedButton(
-                  onPressed: () => Navigator.of(context).pushNamed('/pin-management'),
-                  child: const Text('Seguridad'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red[100],
-                    foregroundColor: Colors.red[800],
-                  ),
-                ),
               ],
-            )
-            ],
-          ),
+            ),
+            const SizedBox(height: 30),
+            Center(
+              child: Column(
+                children: [
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.folder_open),
+                    label: const Text('Ajustar ruta de descarga'),
+                    onPressed: _configureSavePath,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue[100],
+                      foregroundColor: Colors.blue[800],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    icon: _obteniendoUbicacion 
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.location_on),
+                    label: const Text('Retornar geolocalización'),
+                    onPressed: _obteniendoUbicacion ? null : _obtenerUbicacion,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green[100],
+                      foregroundColor: Colors.green[800],
+                    ),
+                  ),
+                  if (_savePath != null) ...[
+                    const SizedBox(height: 8),
+                    Text('Ruta actual: $_savePath', style: TextStyle(fontSize: 12, color: Colors.grey), textAlign: TextAlign.center),
+                  ],
+                  if (_ubicacionActual != null) ...[
+                    const SizedBox(height: 8),
+                    Text('Ubicación: ${_ubicacionActual!.latitude.toStringAsFixed(6)}, ${_ubicacionActual!.longitude.toStringAsFixed(6)}', style: TextStyle(fontSize: 12, color: Colors.grey), textAlign: TextAlign.center),
+                  ],
+                  const SizedBox(height: 20),
+                  const Text('Alejandro Silva', style: TextStyle(color: Colors.grey, fontSize: 12), textAlign: TextAlign.center),
+                  const Text('Edicxon Mendoza', style: TextStyle(color: Colors.grey, fontSize: 12), textAlign: TextAlign.center),
+                  const SizedBox(height: 4),
+                  const Text('Versión 1.0.0 - © 2025', style: TextStyle(color: Colors.grey, fontSize: 10, fontStyle: FontStyle.italic), textAlign: TextAlign.center),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
-      
     );
   }
 }

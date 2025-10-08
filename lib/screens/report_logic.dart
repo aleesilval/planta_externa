@@ -149,12 +149,14 @@ Future<bool> generateAndCompressReport({
   required PlatformFile? archivoOtdr,
   required BuildContext context,
   required String savePath,
+  pw.Document? pdfDocument,
   Map<String, String>? datosTecnicos,
   Map<String, Map<int, String>>? mediciones,
   List<String>? distribucionBuffers,
 }) async {
   try {
-    final pdf = await _generarPDFCompleto(
+    // Usar el PDF proporcionado o generar uno nuevo
+    final pdf = pdfDocument ?? await _generarPDFCompleto(
       instalador: instalador,
       fecha: fecha,
       ubicacion: ubicacion,
@@ -176,26 +178,38 @@ Future<bool> generateAndCompressReport({
     final pdfBytes = await pdf.save();
     archive.addFile(ArchiveFile(pdfName, pdfBytes.length, pdfBytes));
 
+    // Agregar fotos al ZIP (no al PDF, ya están en el PDF)
     for (final entry in fotosPorSeccion.entries) {
       final seccion = entry.key;
       for (int i = 0; i < entry.value.length; i++) {
         final file = entry.value[i];
         final ext = file.extension ?? "jpg";
         final nombreFoto = "${seccion.replaceAll(" ", "_")}_${i + 1}.$ext";
-        archive.addFile(ArchiveFile(
-          nombreFoto,
-          file.size,
-          file.bytes ?? await File(file.path!).readAsBytes(),
-        ));
+        try {
+          final bytes = file.bytes ?? await File(file.path!).readAsBytes();
+          archive.addFile(ArchiveFile(
+            nombreFoto,
+            bytes.length,
+            bytes,
+          ));
+        } catch (e) {
+          debugPrint('Error adding photo $nombreFoto: $e');
+        }
       }
     }
 
+    // Agregar PDF OTDR al ZIP
     if (archivoOtdr != null) {
-      archive.addFile(ArchiveFile(
-        archivoOtdr.name,
-        archivoOtdr.size,
-        archivoOtdr.bytes ?? await File(archivoOtdr.path!).readAsBytes(),
-      ));
+      try {
+        final bytes = archivoOtdr.bytes ?? await File(archivoOtdr.path!).readAsBytes();
+        archive.addFile(ArchiveFile(
+          archivoOtdr.name,
+          bytes.length,
+          bytes,
+        ));
+      } catch (e) {
+        debugPrint('Error adding OTDR PDF: $e');
+      }
     }
 
     final safeName = nomenclatura.isNotEmpty ? nomenclatura.replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1F\s]'), '_') : 'reporte';

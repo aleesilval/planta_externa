@@ -1,0 +1,27 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Actualizar icono de la app Android",
+			"type": "shell",
+			"command": "flutter pub run flutter_launcher_icons:main",
+			"args": [],
+			"isBackground": false,
+			"problemMatcher": [
+				"$flutter"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Generar iconos de la app",
+			"type": "shell",
+			"command": "flutter pub run flutter_launcher_icons:main",
+			"args": [],
+			"isBackground": false,
+			"problemMatcher": [
+				"$flutter"
+			],
+			"group": "build"
+		}
+	]
+}
