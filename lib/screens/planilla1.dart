@@ -1,5 +1,5 @@
 // Importaciones necesarias para el formulario de auditoría
-// ignore_for_file: use_build_context_synchronously
+// ignore_for_file: use_build_context_synchronously, unnecessary_import, prefer_const_declarations, avoid_print, prefer_const_constructors, prefer_interpolation_to_compose_strings
 
 
 
@@ -144,39 +144,6 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
   int? _editNro; // Número de fila en edición (null = nueva fila)
 
   // === PERSISTENCIA LOCAL ===
-  /// Obtiene la ruta del archivo local para guardar datos
-  Future<File> get _localFile async {
-    final directory = await getApplicationDocumentsDirectory();
-    return File('${directory.path}/planilla1_data.json');
-  }
-
-  /// Carga datos guardados localmente al iniciar la app
-  Future<void> _cargarDatos() async {
-    try {
-      final file = await _localFile;
-      if (await file.exists()) {
-        final contents = await file.readAsString();
-        final List<dynamic> jsonData = json.decode(contents);
-        _tabla.clear();
-        _tabla.addAll(jsonData.cast<Map<String, dynamic>>());
-        if (_tabla.isNotEmpty) {
-          // Encuentra el contador más alto y continúa desde ahí
-          _contador = _tabla.map((e) => e['contador'] as int).reduce((a, b) => a > b ? a : b) + 1;
-          _bloquearCabecera = true; // Bloquea campos de cabecera si hay datos
-        }
-        setState(() {});
-      }
-    } catch (_) {} // Ignora errores de carga
-  }
-
-  /// Guarda todos los datos en archivo local
-  Future<void> _guardarDatos() async {
-    try {
-      final file = await _localFile;
-      await file.writeAsString(json.encode(_tabla));
-    } catch (_) {} // Ignora errores de guardado
-  }
-
   /// Muestra previsualización de la ruta
   Future<void> _previsualizarRuta() async {
     final coordenadas = <Map<String, dynamic>>[];
@@ -372,7 +339,6 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
   @override
   void initState() {
     super.initState();
-    _cargarDatos(); // Carga datos al inicializar
     _loadSavedDataFromManager();
   }
   
@@ -393,8 +359,19 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
         _contador = savedData['contador'] ?? 1;
         _bloquearCabecera = savedData['bloquearCabecera'] ?? false;
         if (savedData['evidenciaFotografica'] != null) {
+          final List<Map<String, dynamic>> loadedEvidencia = [];
+          (savedData['evidenciaFotografica'] as List<dynamic>).forEach((item) {
+            final fileData = item['foto'] as Map<String, dynamic>;
+            final file = PlatformFile(name: fileData['name'], path: fileData['path'], size: fileData['size']);
+            loadedEvidencia.add({
+              'foto': file,
+              'bytes': null, // Se cargará si se necesita una vista previa.
+              'descripcion': item['descripcion'],
+              'geolocalizacion': item['geolocalizacion'],
+            });
+          });
           _evidenciaFotografica.clear();
-          _evidenciaFotografica.addAll(List<Map<String, dynamic>>.from(savedData['evidenciaFotografica']));
+          _evidenciaFotografica.addAll(loadedEvidencia);
         }
       });
     }
@@ -430,7 +407,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
   String _morseteriaIdentificada = 'Bajo Norma';
   String _tipoElemento = 'CL';
   String _modeloElementoFijado = '288H';
-  String _elementoFijacion = '1 fleje';
+  String _elementoFijacion = ' - ';
   final TextEditingController _cantidadElementoController = TextEditingController();
   final TextEditingController _geolocalizacionElementoController = TextEditingController();
   final TextEditingController _yk01Controller = TextEditingController();
@@ -513,7 +490,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
   final List<String> _opcionesTendidoAccion = ['Se corrige', 'Se agenda correccion', 'No procede'];
   final List<String> _opcionesReservasActual = ['Bajo norma', 'Fuera de norma'];
   final List<String> _opcionesReservasAccion = ['Se rehace la reserva', 'Se coloca precinto', 'Se mueve reserva', 'Se agenda correccion', 'No procede'];
-  final List<String> _opcionesTarjetaIdentificacion = ['Posee', 'Se coloca', 'Se reemplaza'];
+  final List<String> _opcionesTarjetaIdentificacion = ['Posee', 'Requiere identificacion', 'Se reemplaza', 'No Posee'];
   final List<String> _opcionesRequierePoda = ['Sí', 'No'];
 
   List<String> get _opcionesTendidoAccionDinamicas {
@@ -555,6 +532,16 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
     int total = _tabla.length;
     int inspeccionados = _tabla.where((fila) => fila['posteInspeccionado'] == 'Sí').length;
     return total - inspeccionados;
+  }
+
+  Future<void> _limpiarArchivosTemporalesPlanilla1() async {
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final planillaDir = Directory('${tempDir.path}/planilla1_files');
+      if (await planillaDir.exists()) {
+        await planillaDir.delete(recursive: true);
+      }
+    } catch (e) { /* Ignorar errores */ }
   }
 
   Future<void> _limpiarTodo() async {
@@ -622,7 +609,8 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
         for (final c in _medicionesPuertos1550) { c.clear(); }
         for (final c in _medicionesPuertos1490) { c.clear(); }
       });
-      _guardarDatos();
+      await _saveDraft();
+      await _limpiarArchivosTemporalesPlanilla1();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Formulario y tabla limpiados')),
       );
@@ -674,7 +662,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
         for (final c in _medicionesPuertos1550) { c.clear(); }
         for (final c in _medicionesPuertos1490) { c.clear(); }
       });
-      _guardarDatos();
+      await _saveDraft();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(_editNro == null ? 'Fila agregada a la tabla' : 'Fila modificada')),
       );
@@ -781,8 +769,30 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
   }
 
   Future<void> _saveDraft() async {
-    await _guardarDatos();
+    // 1. Crear directorio temporal para esta planilla si no existe
+    final tempDir = await getTemporaryDirectory();
+    final planillaDir = Directory('${tempDir.path}/planilla1_files');
+    if (!await planillaDir.exists()) {
+      await planillaDir.create();
+    }
     
+    // 2. Copiar fotos y guardar sus nuevas rutas
+    List<Map<String, dynamic>> evidenciaParaGuardar = [];
+    for (var evidencia in _evidenciaFotografica) {
+      final file = evidencia['foto'] as PlatformFile;
+      Map<String, dynamic> newEvidencia = {
+        'descripcion': evidencia['descripcion'],
+        'geolocalizacion': evidencia['geolocalizacion'],
+      };
+      if (file.path != null && !file.path!.startsWith(planillaDir.path)) {
+        final newPath = '${planillaDir.path}/${DateTime.now().millisecondsSinceEpoch}_${file.name}';
+        await File(file.path!).copy(newPath);
+        newEvidencia['foto'] = {'name': file.name, 'path': newPath, 'size': file.size};
+      } else if (file.path != null) { // Ya está en la carpeta temporal
+        newEvidencia['foto'] = {'name': file.name, 'path': file.path, 'size': file.size};
+      }
+      evidenciaParaGuardar.add(newEvidencia);
+    }
     // Save to data manager for cross-planilla persistence
     final dataToSave = {
       'unidadNegocio': _unidadNegocioController.text,
@@ -794,7 +804,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
       'tabla': List.from(_tabla),
       'contador': _contador,
       'bloquearCabecera': _bloquearCabecera,
-      'evidenciaFotografica': List.from(_evidenciaFotografica),
+      'evidenciaFotografica': evidenciaParaGuardar,
     };
     
     _dataManager.savePlanilla1Data(dataToSave);
@@ -1249,7 +1259,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                               pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text('${fila['correctoEtiquetado'] ?? 'Si'}', style: const pw.TextStyle(fontSize: 9))),
                             ],
                           )
-                        ).toList(),
+                        ),
                       ],
                     ),
                   ],
@@ -1282,7 +1292,14 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text('Auditoría de Mantenimiento'),
+          title: const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Auditoria Mantenimiento'),
+              Text('Inspeccion por posteadura',style: TextStyle(fontSize: 12),
+                ),
+              ],
+            ),
         actions: [
           IconButton(
             tooltip: "Guardar",
@@ -1318,7 +1335,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                     _buildDropdownField('Hilos', _hilos, hilosOptions, (val) {
                       setState(() { _hilos = val!; });
                     }, enabled: !_bloquearCabecera),
-                    _buildTextField('CantidadYK01', _yk01Controller, inputType: TextInputType.number),
+                    _buildTextField('Cantidad YK01', _yk01Controller, inputType: TextInputType.number),
                     GeoField(
                       controller: _geolocalizacionElementoController,
                       label: 'Geolocalización del elemento fijado',
@@ -1340,7 +1357,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                       });
                     }),
                     if (_posteInter == 'Sí')
-                      _buildDropdownField('Identificación acorde a manual de mantenimiento', _identificacionManual, _opcionesIdentificacionManual, (val) {
+                      _buildDropdownField('Identificación acorde al manual de mantenimiento', _identificacionManual, _opcionesIdentificacionManual, (val) {
                         setState(() { 
                           _identificacionManual = val!;
                           if (_identificacionManual == 'No') {
@@ -1412,7 +1429,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                       setState(() { _elementoFijacion = val!; });
                     }),
                     _buildTextField('Descripción de fijación', _cantidadElementoController, enabled: _elementoFijacion == 'otro'),
-                    _buildDropdownField('Posee tarjeta de identificación', _tarjetaIdentificacion, _opcionesTarjetaIdentificacion, (val) {
+                    _buildDropdownField('Contiene tarjeta de identificación de FO', _tarjetaIdentificacion, _opcionesTarjetaIdentificacion, (val) {
                       setState(() { _tarjetaIdentificacion = val!; });
                     }),
                     // Tendido con perdida de tensión actual/acción

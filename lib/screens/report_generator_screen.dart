@@ -12,6 +12,7 @@ import 'package:flutter/services.dart';
 import 'dart:typed_data';
 import 'dart:io';
 import 'report_logic.dart';
+import 'package:path_provider/path_provider.dart';
 import '../data/form_data_manager.dart';
 
 // Clase auxiliar para foto con descripción
@@ -133,7 +134,7 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
   final FormDataManager _dataManager = FormDataManager();
 
   @override
-  void initState() {
+  void initState() { 
     super.initState();
     _obtenerUbicacion();
     _loadSavedData();
@@ -141,7 +142,7 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
   
   void _loadSavedData() {
     final savedData = _dataManager.getPlanilla2Data();
-    if (savedData.isNotEmpty) {
+    if (savedData.isNotEmpty) { 
       setState(() {
         _tecnicoController.text = savedData['tecnico'] ?? '';
         _unidadNegocioController.text = savedData['unidadNegocio'] ?? '';
@@ -154,17 +155,73 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
         _fdtConClosureSecundario = savedData['fdtConClosureSecundario'];
         _nomenclatura = savedData['nomenclatura'] ?? '';
         _tipoInstalacion = savedData['tipoInstalacion'] ?? 'Aerea';
+        _distanciaNapFdtController.text = savedData['distanciaNapFdt'] ?? '';
+        _distanciaFdtOdfController.text = savedData['distanciaFdtOdf'] ?? '';
+        _cantidadEmpalmesController.text = savedData['cantidadEmpalmes'] ?? '';
+        _tipoSplitterController.text = savedData['tipoSplitter'] ?? '';
+        _cantidadSplitterController.text = savedData['cantidadSplitter'] ?? '';
         _contieneEtiquetaIdentificacion = savedData['contieneEtiquetaIdentificacion'] ?? 'Si';
         _armadoBajoNorma = savedData['armadoBajoNorma'] ?? 'Si';
         _fijacionBajoNorma = savedData['fijacionBajoNorma'] ?? 'Si';
+        _cantidadCablesSalidaController.text = savedData['cantidadCablesSalida'] ?? '';
         _longitudOnda = savedData['longitudOnda'];
         _datosListos = savedData['datosListos'] ?? false;
         if (savedData['distribucionBuffers'] != null) {
           _distribucionBuffers.clear();
           _distribucionBuffers.addAll(List<String>.from(savedData['distribucionBuffers']));
         }
+        if (savedData['medicionesGuardadas'] != null) {
+          _medicionesGuardadas.clear();
+          try {
+            (savedData['medicionesGuardadas'] as Map<String, dynamic>).forEach((key, value) {
+              _medicionesGuardadas[key] = (value as Map<String, dynamic>).map((k, v) => MapEntry(int.parse(k), v.toString()));
+            });
+          } catch (e) {
+            // Handle parsing error
+          }
+        }
+
+        _loadMapControllerFromString(_napCampos, savedData['napCampos']);
+        _loadMapControllerFromString(_fdtCamposNo, savedData['fdtCamposNo']);
+        _loadMapControllerFromString(_fdtCamposSi, savedData['fdtCamposSi']);
+        _loadMapControllerFromString(_closureDistribucionCampos, savedData['closureDistribucionCampos']);
+        _loadMapControllerFromString(_closureSecundarioCampos, savedData['closureSecundarioCampos']);
+        _loadMapControllerFromString(_closureContinuidadCampos, savedData['closureContinuidadCampos']);
+        _loadMapControllerFromString(_closureReparacionCampos, savedData['closureReparacionCampos']);
+
+        // Cargar archivos
+        if (savedData['fotosPorSeccion'] != null) {
+          _fotosPorSeccion.clear();
+          (savedData['fotosPorSeccion'] as Map<String, dynamic>).forEach((seccion, files) {
+            final fileList = (files as List<dynamic>).map((fileData) {
+              return PlatformFile(name: fileData['name'], path: fileData['path'], size: fileData['size']);
+            }).toList();
+            _fotosPorSeccion[seccion] = fileList;
+          });
+        }
+        if (savedData['archivoOtdr'] != null) {
+          final otdrData = savedData['archivoOtdr'] as Map<String, dynamic>;
+          _archivoOtdr = PlatformFile(
+            name: otdrData['name'],
+            path: otdrData['path'],
+            size: otdrData['size']);
+        }
       });
     }
+  }
+
+  void _loadMapControllerFromString(Map<String, TextEditingController> controllerMap, Map<String, dynamic>? savedMap) {
+    if (savedMap != null) {
+      savedMap.forEach((key, value) {
+        if (controllerMap.containsKey(key)) {
+          controllerMap[key]!.text = value;
+        }
+      });
+    }
+  }
+
+  Map<String, String> _mapControllerToString(Map<String, TextEditingController> map) {
+    return map.map((key, value) => MapEntry(key, value.text));
   }
 
   Future<void> _obtenerUbicacion() async {
@@ -693,24 +750,40 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
     if (mounted) setState(() => _generando = false);
   }
 
+  Map<String, String> _getDatosTecnicos() {
+    final Map<String, String> datos = {
+      'Tipo de Instalación': _tipoInstalacion,
+      'Contiene etiqueta de identificacion': _contieneEtiquetaIdentificacion,
+      'Armado bajo norma': _armadoBajoNorma,
+      'Fijación bajo norma': _fijacionBajoNorma,
+      'Cantidad de cables de salida': _cantidadCablesSalidaController.text,
+    };
+
+    if (_elementoSeleccionado != "Closure") {
+      datos['Tipo de Splitter'] = _tipoSplitterController.text;
+      datos['Cantidad de Splitter'] = _cantidadSplitterController.text;
+    }
+
+    if (_elementoSeleccionado == "NAP") {
+      datos['Distancia NAP a FDT (mts)'] = _distanciaNapFdtController.text;
+      datos['Distancia FDT a ODF (mts)'] = _distanciaFdtOdfController.text;
+      datos['Cantidad de empalmes desde ODF'] = _cantidadEmpalmesController.text;
+    }
+
+    return datos;
+  }
+
   Future<void> _generarComprimido() async {
-    // Preguntar por la ruta de guardado
     String? selectedDirectory = await FilePicker.platform.getDirectoryPath();
     if (selectedDirectory == null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Generación cancelada - No se seleccionó ruta de guardado')),
-        );
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Generación cancelada')));
       return;
     }
 
     if (mounted) setState(() => _generando = true);
 
     try {
-      // Generar el PDF completo con fotos
       final pdf = await _generarPDF(incluirFotos: true);
-      
       final success = await generateAndCompressReport(
         instalador: _tecnicoController.text,
         fecha: _fechaActual,
@@ -720,17 +793,25 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
         closureNaturaleza: _closureNaturaleza,
         fdtConClosureSecundario: _fdtConClosureSecundario,
         campos: _getCampos(),
+        feeder: _feederController.text,
+        buffer: _bufferController.text,
         nomenclatura: _nomenclatura,
         fotosPorSeccion: _fotosPorSeccion,
         archivoOtdr: _archivoOtdr,
         context: context,
         savePath: selectedDirectory,
         pdfDocument: pdf,
+        datosTecnicos: _getDatosTecnicos(),
+        mediciones: _medicionesGuardadas,
+        distribucionBuffers: _distribucionBuffers,
       );
 
       if (mounted) {
         if (success) {
-          final zipName = _nomenclatura.isNotEmpty ? '$_nomenclatura.zip' : 'reporte.zip';
+          final safeFeeder = _feederController.text.replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1F\s]'), '_');
+          final safeBuffer = _bufferController.text.replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1F\s]'), '_');
+          final safeNomenclatura = _nomenclatura.replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1F\s]'), '_');
+          final zipName = '${safeFeeder}-${safeBuffer}-${safeNomenclatura}.zip';
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Archivo $zipName generado exitosamente en:\n$selectedDirectory'),
@@ -1186,7 +1267,41 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
     });
   }
 
-  void _guardarDatos() {
+  Future<void> _guardarDatos() async {
+    // 1. Crear directorio temporal para esta planilla si no existe
+    final tempDir = await getTemporaryDirectory();
+    final planilla2Dir = Directory('${tempDir.path}/planilla2_files');
+    if (!await planilla2Dir.exists()) {
+      await planilla2Dir.create();
+    }
+
+    // 2. Copiar fotos y guardar sus nuevas rutas
+    Map<String, List<Map<String, dynamic>>> fotosParaGuardar = {};
+    for (var entry in _fotosPorSeccion.entries) {
+      List<Map<String, dynamic>> fileList = [];
+      for (var file in entry.value) {
+        if (file.path != null && !file.path!.startsWith(planilla2Dir.path)) {
+          final newPath = '${planilla2Dir.path}/${DateTime.now().millisecondsSinceEpoch}_${file.name}';
+          await File(file.path!).copy(newPath);
+          fileList.add({'name': file.name, 'path': newPath, 'size': file.size});
+        } else if (file.path != null) { // Ya está en la carpeta temporal
+          fileList.add({'name': file.name, 'path': file.path, 'size': file.size});
+        }
+      }
+      fotosParaGuardar[entry.key] = fileList;
+    }
+
+    // 3. Copiar archivo OTDR y guardar su nueva ruta
+    Map<String, dynamic>? otdrParaGuardar;
+    if (_archivoOtdr != null && _archivoOtdr!.path != null && !_archivoOtdr!.path!.startsWith(planilla2Dir.path)) {
+        final newPath = '${planilla2Dir.path}/${DateTime.now().millisecondsSinceEpoch}_${_archivoOtdr!.name}';
+        await File(_archivoOtdr!.path!).copy(newPath);
+        otdrParaGuardar = {'name': _archivoOtdr!.name, 'path': newPath, 'size': _archivoOtdr!.size};
+    } else if (_archivoOtdr != null && _archivoOtdr!.path != null) { // Ya está en la carpeta temporal
+        otdrParaGuardar = {'name': _archivoOtdr!.name, 'path': _archivoOtdr!.path, 'size': _archivoOtdr!.size};
+    }
+
+
     final dataToSave = {
       'tecnico': _tecnicoController.text,
       'unidadNegocio': _unidadNegocioController.text,
@@ -1199,12 +1314,28 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
       'fdtConClosureSecundario': _fdtConClosureSecundario,
       'nomenclatura': _nomenclatura,
       'tipoInstalacion': _tipoInstalacion,
+      'distanciaNapFdt': _distanciaNapFdtController.text,
+      'distanciaFdtOdf': _distanciaFdtOdfController.text,
+      'cantidadEmpalmes': _cantidadEmpalmesController.text,
+      'tipoSplitter': _tipoSplitterController.text,
+      'cantidadSplitter': _cantidadSplitterController.text,
       'contieneEtiquetaIdentificacion': _contieneEtiquetaIdentificacion,
       'armadoBajoNorma': _armadoBajoNorma,
       'fijacionBajoNorma': _fijacionBajoNorma,
+      'cantidadCablesSalida': _cantidadCablesSalidaController.text,
       'longitudOnda': _longitudOnda,
       'datosListos': _datosListos,
       'distribucionBuffers': List.from(_distribucionBuffers),
+      'medicionesGuardadas': _medicionesGuardadas,
+      'napCampos': _mapControllerToString(_napCampos),
+      'fdtCamposNo': _mapControllerToString(_fdtCamposNo),
+      'fdtCamposSi': _mapControllerToString(_fdtCamposSi),
+      'closureDistribucionCampos': _mapControllerToString(_closureDistribucionCampos),
+      'closureSecundarioCampos': _mapControllerToString(_closureSecundarioCampos),
+      'closureContinuidadCampos': _mapControllerToString(_closureContinuidadCampos),
+      'closureReparacionCampos': _mapControllerToString(_closureReparacionCampos),
+      'fotosPorSeccion': fotosParaGuardar,
+      'archivoOtdr': otdrParaGuardar,
     };
     
     _dataManager.savePlanilla2Data(dataToSave);
@@ -1213,6 +1344,15 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
     );
   }
 
+  Future<void> _limpiarArchivosTemporales() async {
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final planilla2Dir = Directory('${tempDir.path}/planilla2_files');
+      if (await planilla2Dir.exists()) {
+        await planilla2Dir.delete(recursive: true);
+      }
+    } catch (e) { /* Ignorar errores */ }
+  }
   Future<void> _limpiarCampos() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -1290,6 +1430,8 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
         _distribucionBuffers.clear();
         _bufferSeleccionado = null;
       });
+
+      await _limpiarArchivosTemporales();
       
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Campos limpiados')),
@@ -1431,11 +1573,19 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
-                  ElevatedButton.icon(
-                    icon: const Icon(Icons.check),
-                    label: const Text("Datos Listos"),
-                    onPressed: () => setState(() => _datosListos = true),
-                  ),
+                  Row(
+                    children: [
+                      const Text("Datos Listos"),
+                      Switch(
+                        value: _datosListos,
+                        onChanged: (bool value) {
+                          setState(() {
+                            _datosListos = value;
+                          });
+                        },
+                      ),
+                    ],
+                  ),                  
                   const SizedBox(width: 8),
                   ElevatedButton.icon(
                     icon: _generando ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.preview),

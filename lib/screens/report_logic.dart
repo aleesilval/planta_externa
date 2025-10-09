@@ -146,6 +146,8 @@ Future<bool> generateAndCompressReport({
   required String? closureNaturaleza,
   required String? fdtConClosureSecundario,
   required Map<String, String> campos,
+  required String feeder,
+  required String buffer,
   required String nomenclatura,
   required Map<String, List<PlatformFile>> fotosPorSeccion,
   required PlatformFile? archivoOtdr,
@@ -214,8 +216,11 @@ Future<bool> generateAndCompressReport({
       }
     }
 
-    final safeName = nomenclatura.isNotEmpty ? nomenclatura.replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1F\s]'), '_') : 'reporte';
-    final zipName = '$safeName.zip';
+    final safeFeeder = feeder.replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1F\s]'), '_');
+    final safeBuffer = buffer.replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1F\s]'), '_');
+    final safeNomenclatura = nomenclatura.isNotEmpty ? nomenclatura.replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1F\s]'), '_') : 'reporte';
+
+    final zipName = '${safeFeeder}-${safeBuffer}-${safeNomenclatura}.zip';
     final zipPath = '$savePath/$zipName';
     final zipFile = File(zipPath);
     final zipBytes = ZipEncoder().encode(archive);
@@ -283,7 +288,8 @@ Future<bool> saveAndCompressToDownloads({
     if (downloadsDir == null) {
       throw Exception("No se pudo acceder a la carpeta de descargas");
     }
-    final zipPath = '${downloadsDir.path}/Reporte_$safeName.zip';
+    final fechaZip = "${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}-${DateTime.now().day.toString().padLeft(2, '0')}";
+    final zipPath = '${downloadsDir.path}/Reporte_${safeName}_$fechaZip.zip';
     final encoder = ZipFileEncoder();
     encoder.create(zipPath);
     encoder.addDirectory(reportDir, includeDirName: true);

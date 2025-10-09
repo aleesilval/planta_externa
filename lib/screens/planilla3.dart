@@ -134,11 +134,65 @@ class _Planilla3PageState extends State<Planilla3Page> {
             _medicionesPuertos1490[i].text = i < l1490.length ? l1490[i] : '';
           }
         }
+
+        // Cargar archivos
+        if (savedData['evidenciaFotografica'] != null) {
+          _evidenciaFotografica.clear();
+          (savedData['evidenciaFotografica'] as List<dynamic>).forEach((item) {
+            final fileData = item['foto'] as Map<String, dynamic>;
+            final file = PlatformFile(name: fileData['name'], path: fileData['path'], size: fileData['size']);
+            _evidenciaFotografica.add({
+              'foto': file,
+              'bytes': null, // Se cargará bajo demanda
+              'descripcion': item['descripcion'],
+            });
+          });
+        }
+        if (savedData['archivoOTDR'] != null) {
+          final otdrData = savedData['archivoOTDR'] as Map<String, dynamic>;
+          _archivoOTDR = PlatformFile(
+            name: otdrData['name'],
+            path: otdrData['path'],
+            size: otdrData['size'],
+          );
+        }
       });
     }
   }
   
-  void _guardarDatos() {
+  Future<void> _guardarDatos() async {
+    // 1. Crear directorio temporal para esta planilla si no existe
+    final tempDir = await getTemporaryDirectory();
+    final planillaDir = Directory('${tempDir.path}/planilla3_files');
+    if (!await planillaDir.exists()) {
+      await planillaDir.create();
+    }
+
+    // 2. Copiar fotos y guardar sus nuevas rutas
+    List<Map<String, dynamic>> evidenciaParaGuardar = [];
+    for (var evidencia in _evidenciaFotografica) {
+      final file = evidencia['foto'] as PlatformFile;
+      Map<String, dynamic> newEvidencia = {'descripcion': evidencia['descripcion']};
+      if (file.path != null && !file.path!.startsWith(planillaDir.path)) {
+        final newPath = '${planillaDir.path}/${DateTime.now().millisecondsSinceEpoch}_${file.name}';
+        await File(file.path!).copy(newPath);
+        newEvidencia['foto'] = {'name': file.name, 'path': newPath, 'size': file.size};
+      } else if (file.path != null) { // Ya está en la carpeta temporal
+        newEvidencia['foto'] = {'name': file.name, 'path': file.path, 'size': file.size};
+      }
+      evidenciaParaGuardar.add(newEvidencia);
+    }
+
+    // 3. Copiar archivo OTDR y guardar su nueva ruta
+    Map<String, dynamic>? otdrParaGuardar;
+    if (_archivoOTDR != null && _archivoOTDR!.path != null && !_archivoOTDR!.path!.startsWith(planillaDir.path)) {
+        final newPath = '${planillaDir.path}/${DateTime.now().millisecondsSinceEpoch}_${_archivoOTDR!.name}';
+        await File(_archivoOTDR!.path!).copy(newPath);
+        otdrParaGuardar = {'name': _archivoOTDR!.name, 'path': newPath, 'size': _archivoOTDR!.size};
+    } else if (_archivoOTDR != null && _archivoOTDR!.path != null) { // Ya está en la carpeta temporal
+        otdrParaGuardar = {'name': _archivoOTDR!.name, 'path': _archivoOTDR!.path, 'size': _archivoOTDR!.size};
+    }
+
     final dataToSave = {
       'tecnico': _tecnicoController.text,
       'unidadNegocio': _unidadNegocioController.text,
@@ -152,6 +206,8 @@ class _Planilla3PageState extends State<Planilla3Page> {
       'materiales': List.from(_materiales),
       'medicionesPuertos1550': _medicionesPuertos1550.map((c) => c.text).toList(),
       'medicionesPuertos1490': _medicionesPuertos1490.map((c) => c.text).toList(),
+      'evidenciaFotografica': evidenciaParaGuardar,
+      'archivoOTDR': otdrParaGuardar,
     };
     
     _dataManager.savePlanilla3Data(dataToSave);
@@ -467,9 +523,6 @@ class _Planilla3PageState extends State<Planilla3Page> {
       await Printing.layoutPdf(
         onLayout: (format) async => pdf.save(),
       );
-      
-      // Limpiar todos los datos después de exportar
-      await _limpiarCampos();
     } catch (e) {
       // Show error message if PDF generation fails
       if (mounted) {
@@ -488,9 +541,20 @@ class _Planilla3PageState extends State<Planilla3Page> {
     if (result != null && _descripcionFotoController.text.isNotEmpty) {
       for (final file in result.files) {
         Uint8List? bytes = file.bytes;
+        String? filePath = file.path;
+
         if (bytes == null && file.path != null) {
           bytes = await File(file.path!).readAsBytes();
         }
+
+        // Si es una foto de la cámara en web, no tendrá path.
+        // En este caso, guardamos los bytes directamente.
+        // En móvil, siempre tendremos un path.
+        if (filePath == null && bytes != null) {
+          // Podríamos guardarlo en un archivo temporal si quisiéramos ser consistentes
+          // pero por ahora, lo mantenemos en memoria para este caso.
+        }
+
         setState(() {
           _evidenciaFotografica.add({
             'foto': file,
@@ -520,67 +584,64 @@ class _Planilla3PageState extends State<Planilla3Page> {
   }
   
   Future<void> _generarZIP() async {
+    String? selectedDirectory = await FilePicker.platform.getDirectoryPath();
+    if (selectedDirectory == null) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Generación cancelada')));
+      return;
+    }
+
     try {
       final pdf = await _generarPDF();
-      final archive = Archive();
-      
-      // Add PDF to archive
-      final nomenclatura = _nomenclaturaController.text.isNotEmpty ? _nomenclaturaController.text : 'informe';
-      final safeName = nomenclatura.replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1F\s]'), '_');
-      final pdfBytes = await pdf.save();
-      archive.addFile(ArchiveFile('$safeName.pdf', pdfBytes.length, pdfBytes));
-      
-      // Add photos to archive
-      for (int i = 0; i < _evidenciaFotografica.length; i++) {
-        final evidencia = _evidenciaFotografica[i];
-        final file = evidencia['foto'] as PlatformFile;
-        final bytes = evidencia['bytes'] as Uint8List?;
-        if (bytes != null) {
-          final ext = file.extension ?? 'jpg';
-          archive.addFile(ArchiveFile('foto_${i + 1}.$ext', bytes.length, bytes));
+
+      Map<String, List<PlatformFile>> fotosPorSeccion = {
+        'Evidencia': _evidenciaFotografica.map((e) => e['foto'] as PlatformFile).toList()
+      };
+
+      final success = await generateAndCompressReport(
+        instalador: _tecnicoController.text,
+        fecha: _fechaActual,
+        ubicacion: _ubicacionActual,
+        unidadNegocio: _unidadNegocioController.text,
+        elemento: "Mantenimiento", // Elemento fijo para esta planilla
+        closureNaturaleza: null,
+        fdtConClosureSecundario: null,
+        campos: {}, // No aplica campos dinámicos de nomenclatura
+        feeder: "-", // No aplica
+        buffer: "-", // No aplica
+        nomenclatura: _nomenclaturaController.text,
+        fotosPorSeccion: fotosPorSeccion,
+        archivoOtdr: _archivoOTDR,
+        context: context,
+        savePath: selectedDirectory,
+        pdfDocument: pdf,
+        datosTecnicos: null, // No aplica
+        mediciones: null, // No aplica
+        distribucionBuffers: null, // No aplica
+      );
+
+      if (mounted) {
+        if (success) {
+          final safeNomenclatura = _nomenclaturaController.text.isNotEmpty ? _nomenclaturaController.text.replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1F\s]'), '_') : 'reporte';
+          // El nombre se construye en report_logic.dart como 'feeder-buffer-nomenclatura'.
+          final zipName = '---$safeNomenclatura.zip';
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Archivo $zipName generado exitosamente en:\n$selectedDirectory'),
+              duration: const Duration(seconds: 5),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Error: No se pudo generar el archivo comprimido')),
+          );
         }
-      }
-      
-      // Add OTDR file to archive
-      if (_archivoOTDR != null) {
-        try {
-          Uint8List? otdrBytes;
-          if (_archivoOTDR!.bytes != null) {
-            otdrBytes = _archivoOTDR!.bytes!;
-          } else if (_archivoOTDR!.path != null) {
-            final file = File(_archivoOTDR!.path!);
-            if (await file.exists()) {
-              otdrBytes = await file.readAsBytes();
-            }
-          }
-          
-          if (otdrBytes != null && otdrBytes.isNotEmpty) {
-            archive.addFile(ArchiveFile(_archivoOTDR!.name, otdrBytes.length, otdrBytes));
-          }
-        } catch (e) {
-          // Continue without OTDR file if error
-        }
-      }
-      
-      // Save ZIP file
-      final tempDir = await getTemporaryDirectory();
-      final zipPath = '${tempDir.path}/$safeName.zip';
-      final zipFile = File(zipPath);
-      final zipBytes = ZipEncoder().encode(archive);
-      if (zipBytes != null) {
-        await zipFile.writeAsBytes(zipBytes);
-        
-        // Show success message with file count
-        final fileCount = archive.files.length;
-        final hasOTDR = _archivoOTDR != null ? 'con OTDR' : 'sin OTDR';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('ZIP generado con $fileCount archivos ($hasOTDR): $zipPath')),
-        );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al generar ZIP: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al generar ZIP: $e')),
+        );
+      }
     }
   }
   
@@ -853,6 +914,7 @@ class _Planilla3PageState extends State<Planilla3Page> {
         _conclusionesController.clear();
         _descripcionFotoController.clear();
         _evidenciaFotografica.clear();
+        _archivoOTDR = null;
 
         _materiales.clear();
         _codigoController.clear();
@@ -863,6 +925,7 @@ class _Planilla3PageState extends State<Planilla3Page> {
         for (final c in _medicionesPuertos1490) { c.clear(); }
       });
       
+      await _limpiarArchivosTemporalesPlanilla3();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Campos limpiados')),
       );
