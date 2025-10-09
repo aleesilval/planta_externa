@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously, prefer_const_constructors, sort_child_properties_last
+
 import 'package:flutter/material.dart';
 import 'package:planta_externa/screens/planilla2.dart';
 import 'package:planta_externa/screens/planilla3.dart';

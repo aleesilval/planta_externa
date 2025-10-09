@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously, unnecessary_import, unused_element
+
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:geolocator/geolocator.dart';
@@ -42,7 +44,7 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
   final TextEditingController _closureController = TextEditingController();
   final TextEditingController _bufferController = TextEditingController();
   final TextEditingController _hiloController = TextEditingController();
-  DateTime _fechaActual = DateTime.now();
+  final DateTime _fechaActual = DateTime.now();
   Position? _ubicacionActual;
 
   // Selección de elemento principal
@@ -435,7 +437,7 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
           children: [
             Expanded(
               child: DropdownButtonFormField<String>(
-                value: _bufferSeleccionado,
+                initialValue: _bufferSeleccionado,
                 items: ['Azul', 'Naranja', 'Verde', 'Marron', 'Gris', 'Blanco', 'Rojo', 'Negro', 'Amarillo', 'Violeta', 'Rosa', 'Aqua']
                     .map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
                 onChanged: (v) => setState(() => _bufferSeleccionado = v),

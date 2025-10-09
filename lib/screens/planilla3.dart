@@ -1,3 +1,5 @@
+// ignore_for_file: unnecessary_import, use_build_context_synchronously, deprecated_member_use
+
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -1041,12 +1043,12 @@ class _Planilla3PageState extends State<Planilla3Page> {
                           ),
                         )
                       : DropdownButtonFormField<String>(
-                          value: _descripcionSeleccionada,
+                          initialValue: _descripcionSeleccionada,
                           items: [
                             ..._tablaArticulos.values.map((descripcion) => 
                               DropdownMenuItem(
                                 value: descripcion, 
-                                child: Container(
+                                child: SizedBox(
                                   width: double.infinity,
                                   child: Text(
                                     descripcion,
@@ -1095,7 +1097,7 @@ class _Planilla3PageState extends State<Planilla3Page> {
                   SizedBox(
                     width: 100,
                     child: DropdownButtonFormField<String>(
-                      value: _unidadSeleccionada,
+                      initialValue: _unidadSeleccionada,
                       items: const [
                         DropdownMenuItem(value: "mts", child: Text("metros")),
                         DropdownMenuItem(value: "cms", child: Text("centimetros")),
@@ -1184,7 +1186,7 @@ class _Planilla3PageState extends State<Planilla3Page> {
                         cells: [
                           DataCell(Text(entry.value['codigo'] ?? '', style: const TextStyle(fontSize: 9))),
                           DataCell(
-                            Container(
+                            SizedBox(
                               width: 200,
                               child: Text(
                                 entry.value['material'] ?? '',

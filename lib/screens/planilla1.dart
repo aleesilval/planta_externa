@@ -1,5 +1,5 @@
 // Importaciones necesarias para el formulario de auditoría
-// ignore_for_file: use_build_context_synchronously
+// ignore_for_file: use_build_context_synchronously, unnecessary_import, avoid_print
 
 
 
@@ -350,8 +350,8 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
       final pathParam = 'color:0xff0000|weight:3|$pathString';
       final markersParams = sampledCoords.map((c) => 'markers=${c['lat']},${c['lng']},red-pushpin').join('&');
 
-      final int width = 1000;
-      final int height = 500;
+      const int width = 1000;
+      const int height = 500;
 
       final url =
           'https://staticmap.openstreetmap.de/staticmap.php?center=$centerLat,$centerLng&zoom=$zoom&size=${width}x$height&maptype=mapnik&$markersParams&path=${Uri.encodeComponent(pathParam)}';
@@ -513,7 +513,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
   final List<String> _opcionesTendidoAccion = ['Se corrige', 'Se agenda correccion', 'No procede'];
   final List<String> _opcionesReservasActual = ['Bajo norma', 'Fuera de norma'];
   final List<String> _opcionesReservasAccion = ['Se rehace la reserva', 'Se coloca precinto', 'Se mueve reserva', 'Se agenda correccion', 'No procede'];
-  final List<String> _opcionesTarjetaIdentificacion = ['Posee', 'Se coloca', 'Se reemplaza'];
+  final List<String> _opcionesTarjetaIdentificacion = ['Posee', 'Se coloca', 'Se reemplaza', 'No posee'];
   final List<String> _opcionesRequierePoda = ['Sí', 'No'];
 
   List<String> get _opcionesTendidoAccionDinamicas {
@@ -966,7 +966,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
               pw.SizedBox(height: 8),
               pw.Text(
                 'Unidad de negocio: ${_unidadNegocioController.text}, Feeder: ${_feederController.text}${(_tipoCable == 'Cable de distribución' || _tipoCable == '4 Hilos') && _bufferController.text.isNotEmpty ? ', Buffer: ${_bufferController.text}' : ''}${_tipoCable == "4 Hilos" ? '   FDT padre: ${_fdtPadreController.text}' : ''}   Tipo de cable: $_tipoCable',
-                style: pw.TextStyle(fontSize: 12),
+                style: const pw.TextStyle(fontSize: 12),
               ),
               pw.Divider(),
               pw.Table(
@@ -977,10 +977,11 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                     decoration: const pw.BoxDecoration(color: PdfColors.grey300),
                     children: [
                       pw.Text('Nro', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
-                      pw.Text('YK01', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
+                      pw.Text('Cantidad YK01', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
                       pw.Text('Obs. Diseño', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
                       pw.Text('Propiedad de Inter', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
                       pw.Text('Acción Poste Inter', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
+                      pw.Text('Fecha Tentativa', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
                       pw.Text('Poste inspeccionado', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
                       pw.Text('Soporte de Retención', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
                       pw.Text('Soporte de Suspensión', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
@@ -1171,9 +1172,9 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
       }
       String distanciaStr;
       if (totalDistanciaMetros >= 1000) {
-        distanciaStr = (totalDistanciaMetros / 1000).toStringAsFixed(2) + ' km';
+        distanciaStr = '${(totalDistanciaMetros / 1000).toStringAsFixed(2)} km';
       } else {
-        distanciaStr = totalDistanciaMetros.toStringAsFixed(0) + ' m';
+        distanciaStr = '${totalDistanciaMetros.toStringAsFixed(0)} m';
       }
 
       pdf.addPage(
@@ -1245,6 +1246,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                               pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text('${fila['correctoEtiquetado'] ?? 'Si'}', style: const pw.TextStyle(fontSize: 9))),
                             ],
                           )
+                        // ignore: unnecessary_to_list_in_spreads
                         ).toList(),
                       ],
                     ),
@@ -1314,10 +1316,10 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                     _buildDropdownField('Hilos', _hilos, hilosOptions, (val) {
                       setState(() { _hilos = val!; });
                     }, enabled: !_bloquearCabecera),
-                    _buildTextField('YK01', _yk01Controller, inputType: TextInputType.number),
+                    _buildTextField('Cantidad YK01', _yk01Controller, inputType: TextInputType.number),
                     GeoField(
                       controller: _geolocalizacionElementoController,
-                      label: 'Geolocalización del elemento fijado',
+                      label: 'Geolocalización del poste',
                     ),
                     _buildDropdownField('Observaciones en diseño', _observacionesDiseno, _opcionesObsDiseno, (val) {
                       setState(() { _observacionesDiseno = val!; });
@@ -1399,7 +1401,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                       _buildTextField('Nomenclatura CL', _nomenclaturaElementoController),
                     if (_tipoElemento == 'FDT')
                       _buildTextField('Nomenclatura FDT', _nomenclaturaElementoController),
-                    _buildDropdownField('Correcto etiquetado', _correctoEtiquetado, ['Si', 'No'], (val) {
+                    _buildDropdownField('Correcto etiquetado del elemento', _correctoEtiquetado, ['Si', 'No'], (val) {
                       setState(() {
                         _correctoEtiquetado = val ?? 'Si';
                       });
@@ -1408,7 +1410,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                       setState(() { _elementoFijacion = val!; });
                     }),
                     _buildTextField('Descripción de fijación', _cantidadElementoController, enabled: _elementoFijacion == 'otro'),
-                    _buildDropdownField('Posee tarjeta de identificación', _tarjetaIdentificacion, _opcionesTarjetaIdentificacion, (val) {
+                    _buildDropdownField('Correcta tarjeta de identificación en el tendido', _tarjetaIdentificacion, _opcionesTarjetaIdentificacion, (val) {
                       setState(() { _tarjetaIdentificacion = val!; });
                     }),
                     // Tendido con perdida de tensión actual/acción
@@ -1423,7 +1425,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                       }); 
                     }),
                     _buildDropdownField('Tendido con perdida de tensión acción', _tendidoAccion, _opcionesTendidoAccionDinamicas, (val) { setState(() { _tendidoAccion = val!; }); }),
-                    _buildDropdownField('Reservas Actual', _opcionesReservasActual.contains(_reservasActual) ? _reservasActual : _opcionesReservasActual[0], _opcionesReservasActual, (val) {
+                    _buildDropdownField('Estado de la Reservas Actual', _opcionesReservasActual.contains(_reservasActual) ? _reservasActual : _opcionesReservasActual[0], _opcionesReservasActual, (val) {
                       setState(() { 
                         _reservasActual = val!; 
                         if (val == 'Bajo norma') {
@@ -1433,7 +1435,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                         }
                       });
                     }),
-                    _buildDropdownField('Reservas Acción', _opcionesReservasAccionDinamicas.contains(_reservasAccion) ? _reservasAccion : _opcionesReservasAccionDinamicas[0], _opcionesReservasAccionDinamicas, (val) {
+                    _buildDropdownField('Se procede con la Reservas la Acción', _opcionesReservasAccionDinamicas.contains(_reservasAccion) ? _reservasAccion : _opcionesReservasAccionDinamicas[0], _opcionesReservasAccionDinamicas, (val) {
                       setState(() { _reservasAccion = val!; });
                     }),
                     _buildDropdownField('Requiere poda', _requierePoda, _opcionesRequierePoda, (val) {

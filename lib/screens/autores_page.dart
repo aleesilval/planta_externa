@@ -100,7 +100,7 @@ class _AutoresPageState extends State<AutoresPage> {
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      'Colaborador de Desarrollo',
+                      'Colaborador de Desarrollo - Coordinador de Planta Externa',
                       style: TextStyle(fontSize: 14, color: Colors.grey, fontWeight: FontWeight.w500),
                     ),
                     const SizedBox(height: 8),
@@ -138,12 +138,12 @@ class _AutoresPageState extends State<AutoresPage> {
             const SizedBox(height: 30),
             Card(
               color: Colors.grey[50],
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
+              child: const Padding(
+                padding: EdgeInsets.all(16.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Row(
+                    Row(
                       children: [
                         Icon(Icons.info_outline, color: Colors.orange, size: 24),
                         SizedBox(width: 8),
@@ -153,14 +153,14 @@ class _AutoresPageState extends State<AutoresPage> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    const Text('• Versión: 1.0.0', style: TextStyle(fontSize: 14)),
-                    const SizedBox(height: 4),
-                    const Text('• Fecha de desarrollo: 2025', style: TextStyle(fontSize: 14)),
-                    const SizedBox(height: 4),
-                    const Text('• Departamento: Gestión Técnica - Planta Externa', style: TextStyle(fontSize: 14)),
-                    const SizedBox(height: 4),
-                    const Text('• Tecnología: Flutter/Dart', style: TextStyle(fontSize: 14)),
+                    SizedBox(height: 12),
+                    Text('• Versión: 1.0.1', style: TextStyle(fontSize: 14)),
+                    SizedBox(height: 4),
+                    Text('• Fecha de desarrollo: 2025', style: TextStyle(fontSize: 14)),
+                    SizedBox(height: 4),
+                    Text('• Departamento: Gestión Técnica - Planta Externa', style: TextStyle(fontSize: 14)),
+                    SizedBox(height: 4),
+                    Text('• Tecnología: Flutter/Dart', style: TextStyle(fontSize: 14)),
                   ],
                 ),
               ),
