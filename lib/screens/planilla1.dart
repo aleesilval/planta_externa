@@ -1,20 +1,21 @@
 // Importaciones necesarias para el formulario de auditoría
-// ignore_for_file: use_build_context_synchronously, unnecessary_import, prefer_const_declarations, avoid_print, prefer_const_constructors, prefer_interpolation_to_compose_strings
+// ignore_for_file: use_build_context_synchronously, unnecessary_import, prefer_const_declarations, avoid_print, prefer_const_constructors, prefer_interpolation_to_compose_strings, avoid_function_literals_in_foreach_calls, unused_import
 
-
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:pdf/widgets.dart' as pw; // Para generar PDFs
 import 'package:pdf/pdf.dart';
 import 'package:printing/printing.dart'; // Para imprimir/exportar PDFs Widget personalizado para geolocalización
 import 'package:planta_externa/geo_field.dart'; // Widget personalizado para geolocalización
-import 'dart:io';
+import 'dart:io' show Directory, File;
 import 'dart:convert'; // Para JSON
 import 'dart:math' as math; // Para funciones matemáticas
 import 'package:path_provider/path_provider.dart'; // Para acceso al sistema de archivos
 import 'package:file_picker/file_picker.dart'; // Para selección de archivos
 import 'package:flutter/services.dart'; // Para cargar assets
-import 'package:http/http.dart' as http;
+import '''package:http/http.dart''' as http;
 import 'package:flutter_map/flutter_map.dart' show FlutterMap, MapOptions, Marker, MarkerLayer, Polyline, PolylineLayer, TileLayer;
 import 'package:latlong2/latlong.dart';
 import '../data/form_data_manager.dart';
@@ -140,6 +141,9 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
   // === VARIABLES DE CONTROL ===
   final _formKey = GlobalKey<FormState>(); // Clave para validación del formulario
   final List<Map<String, dynamic>> _tabla = []; // Lista que almacena todas las filas de datos
+  
+  // Mapa capturado por el usuario para el PDF
+  Uint8List? _capturedMapBytes;
   int _contador = 1; // Contador automático para numerar filas
   int? _editNro; // Número de fila en edición (null = nueva fila)
 
@@ -169,6 +173,8 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
       return;
     }
     
+    final GlobalKey _mapCaptureKey = GlobalKey();
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -178,7 +184,10 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
           height: 500,
           child: Column(
             children: [
-              _generarMapaLocal(),
+              RepaintBoundary(
+                key: _mapCaptureKey,
+                child: _generarMapaLocal(),
+              ),
               const SizedBox(height: 16),
               const Text('Postes en la ruta:', style: TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
@@ -207,6 +216,31 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
           ),
         ),
         actions: [
+          TextButton(
+            onPressed: () async {
+              try {
+                final RenderRepaintBoundary boundary = _mapCaptureKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
+                final ui.Image image = await boundary.toImage(pixelRatio: 2.0); // Mayor resolución
+                final ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+                final Uint8List? pngBytes = byteData?.buffer.asUint8List();
+
+                if (pngBytes != null) {
+                  setState(() {
+                    _capturedMapBytes = pngBytes;
+                  });
+                  Navigator.of(context).pop(); // Cerrar el diálogo
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Vista del mapa capturada para el PDF.')),
+                  );
+                }
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Error al capturar el mapa: $e')),
+                );
+              }
+            },
+            child: const Text('Capturar para PDF'),
+          ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('Cerrar'),
@@ -292,36 +326,30 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
       int zoom;
       if (sampledCoords.length == 1) {
         zoom = 13;
-      } else if (maxDiff > 10) {
-        zoom = 3;
-      } else if (maxDiff > 5) {
-        zoom = 4;
-      } else if (maxDiff > 2) {
-        zoom = 6;
-      } else if (maxDiff > 1) {
-        zoom = 8;
-      } else if (maxDiff > 0.5) {
-        zoom = 9;
-      } else if (maxDiff > 0.2) {
-        zoom = 10;
-      } else if (maxDiff > 0.1) {
-        zoom = 11;
-      } else if (maxDiff > 0.02) {
-        zoom = 12;
       } else {
-        zoom = 13;
+        zoom = switch (maxDiff) {
+          > 10 => 3,
+          > 5 => 4,
+          > 2 => 6,
+          > 1 => 8,
+          > 0.5 => 9,
+          > 0.2 => 10,
+          > 0.1 => 11,
+          > 0.02 => 12,
+          _ => 13,
+        };
       }
 
-      // Construir path (traza) y marcadores
-      final pathString = sampledCoords.map((c) => '${c['lat']},${c['lng']}').join('|');
-      final pathParam = 'color:0xff0000|weight:3|$pathString';
-      final markersParams = sampledCoords.map((c) => 'markers=${c['lat']},${c['lng']},red-pushpin').join('&');
+      // Construir path (traza) y marcadores con etiquetas
+      final pathPoints = sampledCoords.map((c) {
+        return '${c['lat']},${c['lng']},red-circle-stroked,${c['poste']}';
+      }).join('|');
+      final pathParam = 'color:0xff0000|weight:3|' + sampledCoords.map((c) => '${c['lat']},${c['lng']}').join('|');
 
       final int width = 1000;
       final int height = 500;
 
-      final url =
-          'https://staticmap.openstreetmap.de/staticmap.php?center=$centerLat,$centerLng&zoom=$zoom&size=${width}x$height&maptype=mapnik&$markersParams&path=${Uri.encodeComponent(pathParam)}';
+      final url = 'https://staticmap.openstreetmap.de/staticmap.php?center=$centerLat,$centerLng&zoom=$zoom&size=${width}x$height&maptype=mapnik&path=${Uri.encodeComponent(pathParam)}&path=${Uri.encodeComponent(pathPoints)}';
 
       final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 12));
       if (response.statusCode == 200) {
@@ -617,7 +645,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
     }
   }
 
-  void _grabarFila() {
+  Future<void> _grabarFila() async {
     if (_formKey.currentState!.validate()) {
       setState(() {
         if (_editNro != null) {
@@ -1159,7 +1187,13 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
     
     // Página de mapa de ruta (siempre se muestra si hay datos)
     if (_tabla.isNotEmpty) {
-      final mapaBytes = await _generarImagenMapaParaPDF();
+      // Usar el mapa capturado si existe, si no, generar uno nuevo.
+      final Uint8List? mapaBytes;
+      if (_capturedMapBytes != null) {
+        mapaBytes = _capturedMapBytes;
+      } else {
+        mapaBytes = await _generarImagenMapaParaPDF();
+      }
       final coordenadasValidas = _tabla.where((fila) =>
         fila['geolocalizacionElemento'] != null &&
         fila['geolocalizacionElemento'].toString().isNotEmpty &&

@@ -1,4 +1,4 @@
-// ignore_for_file: use_build_context_synchronously, unnecessary_import, unused_element
+// ignore_for_file: use_build_context_synchronously, unnecessary_import, unused_element, unnecessary_brace_in_string_interps
 
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';

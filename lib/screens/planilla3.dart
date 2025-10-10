@@ -1,8 +1,9 @@
-// ignore_for_file: unnecessary_import, use_build_context_synchronously, deprecated_member_use
+// ignore_for_file: unnecessary_import, use_build_context_synchronously, deprecated_member_use, unused_import, duplicate_ignore
 
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:planta_externa/screens/report_logic.dart';
 import 'package:printing/printing.dart';
 import 'package:file_picker/file_picker.dart';
 // ignore: unused_import
@@ -138,7 +139,7 @@ class _Planilla3PageState extends State<Planilla3Page> {
         // Cargar archivos
         if (savedData['evidenciaFotografica'] != null) {
           _evidenciaFotografica.clear();
-          (savedData['evidenciaFotografica'] as List<dynamic>).forEach((item) {
+          for (var item in (savedData['evidenciaFotografica'] as List<dynamic>)) {
             final fileData = item['foto'] as Map<String, dynamic>;
             final file = PlatformFile(name: fileData['name'], path: fileData['path'], size: fileData['size']);
             _evidenciaFotografica.add({
@@ -146,7 +147,7 @@ class _Planilla3PageState extends State<Planilla3Page> {
               'bytes': null, // Se cargará bajo demanda
               'descripcion': item['descripcion'],
             });
-          });
+          }
         }
         if (savedData['archivoOTDR'] != null) {
           final otdrData = savedData['archivoOTDR'] as Map<String, dynamic>;
@@ -1430,4 +1431,6 @@ class _Planilla3PageState extends State<Planilla3Page> {
       ),
     );
   }
+  
+  Future<void> _limpiarArchivosTemporalesPlanilla3() async {}
 }
