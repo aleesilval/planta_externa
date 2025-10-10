@@ -1,5 +1,5 @@
 // Importaciones necesarias para el formulario de auditoría
-// ignore_for_file: use_build_context_synchronously, unnecessary_import, prefer_const_declarations, avoid_print, prefer_const_constructors, prefer_interpolation_to_compose_strings, avoid_function_literals_in_foreach_calls, unused_import
+// ignore_for_file: use_build_context_synchronously, unnecessary_import, prefer_const_declarations, avoid_print, prefer_const_constructors, prefer_interpolation_to_compose_strings, avoid_function_literals_in_foreach_calls, unused_import, no_leading_underscores_for_local_identifiers
 
 import 'dart:ui' as ui;
 

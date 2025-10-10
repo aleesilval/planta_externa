@@ -56,6 +56,7 @@ class _Planilla3PageState extends State<Planilla3Page> {
   
   // Mediciones (16 puertos) - doble tabla para 1550nm y 1490nm
   final List<TextEditingController> _medicionesPuertos1550 = List.generate(16, (i) => TextEditingController());
+  final TextEditingController _nomenclaturaMedicionController = TextEditingController();
   final List<TextEditingController> _medicionesPuertos1490 = List.generate(16, (i) => TextEditingController());
   
   // Tabla de artículos predefinida
@@ -123,6 +124,7 @@ class _Planilla3PageState extends State<Planilla3Page> {
           _materiales.clear();
           _materiales.addAll(List<Map<String, String>>.from(savedData['materiales']));
         }
+        _nomenclaturaMedicionController.text = savedData['nomenclaturaMedicion'] ?? '';
         if (savedData['medicionesPuertos1550'] != null) {
           final l1550 = List<String>.from(savedData['medicionesPuertos1550']);
           for (int i = 0; i < 16; i++) {
@@ -205,6 +207,7 @@ class _Planilla3PageState extends State<Planilla3Page> {
       'conclusiones': _conclusionesController.text,
       'soluciones': List.from(_soluciones),
       'materiales': List.from(_materiales),
+      'nomenclaturaMedicion': _nomenclaturaMedicionController.text,
       'medicionesPuertos1550': _medicionesPuertos1550.map((c) => c.text).toList(),
       'medicionesPuertos1490': _medicionesPuertos1490.map((c) => c.text).toList(),
       'evidenciaFotografica': evidenciaParaGuardar,
@@ -420,6 +423,11 @@ class _Planilla3PageState extends State<Planilla3Page> {
                   children: [
                     pw.Text('Mediciones', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
                     pw.SizedBox(height: 16),
+                    if (_nomenclaturaMedicionController.text.isNotEmpty) ...[
+                      pw.Text('Elemento inspeccionado: ${_nomenclaturaMedicionController.text}',
+                          style: pw.TextStyle(fontSize: 12, fontStyle: pw.FontStyle.italic)),
+                      pw.SizedBox(height: 12),
+                    ],
                     pw.Text('Mediciones 1550nm:', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
                     pw.SizedBox(height: 8),
                     pw.Table(
@@ -791,6 +799,11 @@ class _Planilla3PageState extends State<Planilla3Page> {
               children: [
                 pw.Text('Mediciones', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
                 pw.SizedBox(height: 16),
+                if (_nomenclaturaMedicionController.text.isNotEmpty) ...[
+                  pw.Text('Elemento inspeccionado: ${_nomenclaturaMedicionController.text}',
+                      style: pw.TextStyle(fontSize: 12, fontStyle: pw.FontStyle.italic)),
+                  pw.SizedBox(height: 12),
+                ],
                 pw.Text('Mediciones 1550nm:', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
                 pw.SizedBox(height: 8),
                 pw.Table(
@@ -922,6 +935,7 @@ class _Planilla3PageState extends State<Planilla3Page> {
         _descripcionSeleccionada = null;
         _unidadSeleccionada = null;
         _cantidadController.clear();
+        _nomenclaturaMedicionController.clear();
         for (final c in _medicionesPuertos1550) { c.clear(); }
         for (final c in _medicionesPuertos1490) { c.clear(); }
       });
@@ -1286,6 +1300,15 @@ class _Planilla3PageState extends State<Planilla3Page> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    TextField(
+                      controller: _nomenclaturaMedicionController,
+                      decoration: const InputDecoration(
+                        labelText: "Nomenclatura de elemento inspeccionado para confirmar servicio",
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
                     const Text("Mediciones (Puertos 1-16) 1550nm:", style: TextStyle(fontWeight: FontWeight.bold)),
                     Table(
                       border: TableBorder.all(color: Colors.grey),

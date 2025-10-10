@@ -108,6 +108,7 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
   String _fijacionBajoNorma = 'Si';
   final TextEditingController _cantidadCablesSalidaController = TextEditingController();
   bool _datosListos = false;
+  String _tipoNap = 'Sangria';
   
   // Mediciones guardadas
   final Map<String, Map<int, String>> _medicionesGuardadas = {};
@@ -164,6 +165,7 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
         _armadoBajoNorma = savedData['armadoBajoNorma'] ?? 'Si';
         _fijacionBajoNorma = savedData['fijacionBajoNorma'] ?? 'Si';
         _cantidadCablesSalidaController.text = savedData['cantidadCablesSalida'] ?? '';
+        _tipoNap = savedData['tipoNap'] ?? 'Sangria';
         _longitudOnda = savedData['longitudOnda'];
         _datosListos = savedData['datosListos'] ?? false;
         if (savedData['distribucionBuffers'] != null) {
@@ -479,11 +481,19 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
         decoration: const InputDecoration(labelText: "Fijación bajo norma"),
       ),
       const SizedBox(height: 8),
-      TextField(
-        controller: _cantidadCablesSalidaController,
-        decoration: const InputDecoration(labelText: "Cantidad de cables de salida"),
-        keyboardType: TextInputType.number,
-      ),
+      if (_elementoSeleccionado == "NAP")
+        DropdownButtonFormField<String>(
+          initialValue: _tipoNap,
+          items: ['Sangria', 'Continuidad'].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+          onChanged: (v) => setState(() => _tipoNap = v!),
+          decoration: const InputDecoration(labelText: "Tipo de NAP"),
+        )
+      else
+        TextField(
+          controller: _cantidadCablesSalidaController,
+          decoration: const InputDecoration(labelText: "Cantidad de cables de salida"),
+          keyboardType: TextInputType.number,
+        ),
     ]);
     
     // Campo especial para Closure con Naturaleza Distribución
@@ -757,6 +767,7 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
       'Armado bajo norma': _armadoBajoNorma,
       'Fijación bajo norma': _fijacionBajoNorma,
       'Cantidad de cables de salida': _cantidadCablesSalidaController.text,
+      'Tipo de NAP': _tipoNap,
     };
 
     if (_elementoSeleccionado != "Closure") {
@@ -939,6 +950,7 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
                 pw.Text('Armado bajo norma: $_armadoBajoNorma'),
                 pw.Text('Fijación bajo norma: $_fijacionBajoNorma'),
                 pw.Text('Cantidad de cables de salida: ${_cantidadCablesSalidaController.text}'),
+                if (_elementoSeleccionado == "NAP") pw.Text('Tipo de NAP: $_tipoNap'),
                 if (_medicionesGuardadas.isNotEmpty && _elementoSeleccionado != "NAP") ...[
                   pw.SizedBox(height: 8),
                   pw.Text('Mediciones:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
@@ -1323,6 +1335,7 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
       'armadoBajoNorma': _armadoBajoNorma,
       'fijacionBajoNorma': _fijacionBajoNorma,
       'cantidadCablesSalida': _cantidadCablesSalidaController.text,
+      'tipoNap': _tipoNap,
       'longitudOnda': _longitudOnda,
       'datosListos': _datosListos,
       'distribucionBuffers': List.from(_distribucionBuffers),
@@ -1416,6 +1429,7 @@ class _ReportGeneratorScreenState extends State<ReportGeneratorScreen> {
         _armadoBajoNorma = 'Si';
         _fijacionBajoNorma = 'Si';
         _cantidadCablesSalidaController.clear();
+        _tipoNap = 'Sangria';
         _medicionesGuardadas.clear();
         _datosListos = false;
         for (var controller in _medicionesPuertos.values) {

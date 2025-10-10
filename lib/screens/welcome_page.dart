@@ -9,6 +9,7 @@ import 'package:planta_externa/screens/manual_page.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:geolocator/geolocator.dart';
 import '../data/form_data_manager.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -44,23 +45,64 @@ class _WelcomePageState extends State<WelcomePage> {
       _obteniendoUbicacion = true;
     });
     
+    // 1. Verificar si los servicios de ubicación están habilitados
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Los servicios de ubicación están desactivados.')),
+        );
+      }
+      setState(() => _obteniendoUbicacion = false);
+      return;
+    }
+
+    // 2. Verificar y solicitar permisos de ubicación
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('El permiso de ubicación fue denegado.')),
+          );
+        }
+        setState(() => _obteniendoUbicacion = false);
+        return;
+      }
+    }
+    
+    if (permission == LocationPermission.deniedForever) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Permiso denegado permanentemente. Habilítelo en los ajustes.')),
+        );
+      }
+      setState(() => _obteniendoUbicacion = false);
+      return;
+    } 
+
+    // 3. Si los permisos están concedidos, obtener la ubicación
     try {
       final pos = await Geolocator.getCurrentPosition();
       setState(() {
         _ubicacionActual = pos;
-        _obteniendoUbicacion = false;
       });
       
       await _showLocationOnMap(LatLng(pos.latitude, pos.longitude));
 
     } catch (e) {
-      setState(() {
-        _obteniendoUbicacion = false;
-      });
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al obtener ubicación: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al obtener ubicación: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _obteniendoUbicacion = false;
+        });
+      }
     }
   }
 
