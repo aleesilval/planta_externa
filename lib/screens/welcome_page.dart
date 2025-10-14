@@ -1,4 +1,4 @@
-// ignore_for_file: use_build_context_synchronously, prefer_const_constructors, sort_child_properties_last
+// ignore_for_file: use_build_context_synchronously, prefer_const_constructors, sort_child_properties_last, unused_import
 
 import 'package:flutter/material.dart';
 import 'package:planta_externa/screens/planilla2.dart';
@@ -10,8 +10,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:geolocator/geolocator.dart';
 import '../data/form_data_manager.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:planta_externa/screens/map_widget.dart';
 
 class WelcomePage extends StatefulWidget {
   const WelcomePage({super.key});
@@ -115,28 +115,7 @@ class _WelcomePageState extends State<WelcomePage> {
           content: SizedBox(
             width: 320,
             height: 380,
-            child: FlutterMap(
-              options: MapOptions(
-                initialCenter: location,
-                initialZoom: 16,
-              ),
-              children: [
-                TileLayer(
-                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'com.example.planta_externa',
-                ),
-                MarkerLayer(
-                  markers: [
-                    Marker(
-                      point: location,
-                      width: 40,
-                      height: 40,
-                      child: const Icon(Icons.location_on, color: Colors.red, size: 40),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+            child: MapaConFondo(singleMarker: location),
           ),
           actions: [
             ElevatedButton(

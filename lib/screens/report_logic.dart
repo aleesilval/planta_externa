@@ -1,4 +1,4 @@
-// ignore_for_file: use_build_context_synchronously, unnecessary_brace_in_string_interps
+// ignore_for_file: use_build_context_synchronously, unnecessary_brace_in_string_interps, unnecessary_null_comparison
 
 import 'dart:io';
 import 'package:pdf/widgets.dart' as pw;

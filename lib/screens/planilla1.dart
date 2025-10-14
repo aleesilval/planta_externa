@@ -1,8 +1,6 @@
 // Importaciones necesarias para el formulario de auditoría
-// ignore_for_file: use_build_context_synchronously, unnecessary_import, prefer_const_declarations, avoid_print, prefer_const_constructors, prefer_interpolation_to_compose_strings, avoid_function_literals_in_foreach_calls, unused_import, no_leading_underscores_for_local_identifiers
-
+// ignore_for_file: use_build_context_synchronously, unnecessary_import, prefer_const_declarations, avoid_print, prefer_const_constructors, prefer_interpolation_to_compose_strings, avoid_function_literals_in_foreach_calls, unused_import, no_leading_underscores_for_local_identifiers, deprecated_member_use
 import 'dart:ui' as ui;
-
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:pdf/widgets.dart' as pw; // Para generar PDFs
@@ -15,88 +13,11 @@ import 'dart:math' as math; // Para funciones matemáticas
 import 'package:path_provider/path_provider.dart'; // Para acceso al sistema de archivos
 import 'package:file_picker/file_picker.dart'; // Para selección de archivos
 import 'package:flutter/services.dart'; // Para cargar assets
-import '''package:http/http.dart''' as http;
-import 'package:flutter_map/flutter_map.dart' show FlutterMap, MapOptions, Marker, MarkerLayer, Polyline, PolylineLayer, TileLayer;
+import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import '../data/form_data_manager.dart';
 import 'dart:typed_data'; // Para Uint8List
-
-/// Calcula la distancia entre dos puntos (Haversine, en metros)
-
-
-/// Widget de mapa con flutter_map
-class MapaConFondo extends StatelessWidget {
-  final List<Map<String, dynamic>> coordenadas;
-  
-  const MapaConFondo({super.key, required this.coordenadas});
-  
-  @override
-  Widget build(BuildContext context) {
-    if (coordenadas.isEmpty) {
-      return Container(
-        height: 300,
-        decoration: BoxDecoration(border: Border.all(color: Colors.grey)),
-        child: const Center(child: Text('No hay coordenadas para mostrar')),
-      );
-    }
-    
-    final points = coordenadas.map((c) => LatLng(c['lat']! as double, c['lng']! as double)).toList();
-    
-    final markers = coordenadas.map((coord) {
-      return Marker(
-        point: LatLng(coord['lat']! as double, coord['lng']! as double),
-        width: 30,
-        height: 30,
-        child: Container(
-          decoration: const BoxDecoration(
-            color: Colors.red,
-            shape: BoxShape.circle,
-          ),
-          child: Center(
-            child: Text(
-              '${coord['poste']}',
-              style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-            ),
-          ),
-        ),
-      );
-    }).toList();
-    
-    return Container(
-      height: 300,
-      decoration: BoxDecoration(border: Border.all(color: Colors.grey)),
-      child: FlutterMap(
-        options: MapOptions(
-          initialCenter: points.length == 1
-              ? points.first
-              : LatLng(
-                  points.map((p) => p.latitude).reduce((a, b) => a + b) / points.length,
-                  points.map((p) => p.longitude).reduce((a, b) => a + b) / points.length,
-                ),
-          initialZoom: points.length == 1 ? 13.0 : 12.0,
-        ),
-        children: [
-          TileLayer(
-            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-            userAgentPackageName: 'com.example.planta_externa',
-          ),
-          if (points.length > 1)
-            PolylineLayer(
-              polylines: [
-                Polyline(
-                  points: points,
-                  color: Colors.red,
-                  strokeWidth: 3,
-                ),
-              ],
-            ),
-          MarkerLayer(markers: markers),
-        ],
-      ),
-    );
-  }
-}
-
+import 'package:planta_externa/screens/map_widget.dart';
 
 
 /// Widget wrapper que contiene el formulario principal
@@ -378,6 +299,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
         _feederController.text = savedData['feeder'] ?? '';
         _bufferController.text = savedData['buffer'] ?? '';
         _tipoCable = savedData['tipoCable'] ?? 'Cable alimentador';
+        _tipoInstalacion = savedData['tipoInstalacion'] ?? 'Aerea';
         _hilos = savedData['hilos'] ?? 'Azul';
         _fdtPadreController.text = savedData['fdtPadre'] ?? '';
         if (savedData['tabla'] != null) {
@@ -410,6 +332,8 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
   final TextEditingController _feederController = TextEditingController();
   final TextEditingController _bufferController = TextEditingController();
   String _tipoCable = 'Cable alimentador';
+  String _tipoInstalacion = 'Aerea';
+  final List<String> _opcionesTipoInstalacion = ['Aerea', 'Subterranea'];
   String _hilos = 'Azul';
   final TextEditingController _fdtPadreController = TextEditingController();
 
@@ -432,6 +356,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
   // Campos condicionales
   final TextEditingController _soporteRetencionController = TextEditingController();
   final TextEditingController _soporteSuspensionController = TextEditingController();
+  final TextEditingController _sfpController = TextEditingController();
   String _morseteriaIdentificada = 'Bajo Norma';
   String _tipoElemento = 'CL';
   String _modeloElementoFijado = '288H';
@@ -455,6 +380,8 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
   final TextEditingController _zonasPodaInicioController = TextEditingController();
   final TextEditingController _zonasPodaFinController = TextEditingController();
   final TextEditingController _observacionesController = TextEditingController();
+  final TextEditingController _descripcionAccionPosteInterController = TextEditingController();
+  final TextEditingController _descripcionMaterialesUtilizadosController = TextEditingController();
   final TextEditingController _trabajosPendientesController = TextEditingController();
   
   // Evidencia fotográfica
@@ -486,9 +413,15 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
       'Negro', 'Amarillo', 'Violeta', 'Rosa', 'Aqua'
     ],
   };
-  final List<String> _opcionesMorseteria = ['Bajo Norma', 'Fuera de Norma'];
-  final List<String> _opcionesElementoFijacion = [' - ','1 fleje','2 fleje','1 tirraje','2 tirraje','otro'];
-  final List<String> _opcionesMateriales = [
+  final List<String> _opcionesMorseteriaAerea = ['Bajo Norma', 'Fuera de Norma'];
+  final List<String> _opcionesElementoFijacionAerea = [' - ','1 fleje','2 fleje','1 tirraje','2 tirraje','otro'];
+  final List<String> _opcionesElementoFijacionSubterranea = ['Tanquilla', 'Pedestal'];
+  List<String> get _opcionesElementoFijacion {
+    if (_tipoInstalacion == 'Subterranea') return _opcionesElementoFijacionSubterranea;
+    return _opcionesElementoFijacionAerea;
+  }
+
+  final List<String> _opcionesMaterialesAerea = [
     ' - ',
     'Adición de fleje faltante',
     'Adición de precinto en reserva',
@@ -497,10 +430,18 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
     'Reemplazo de Soporte de Suspensión',
     'Colocación de YK01',
   ];
+  final List<String> _opcionesMaterialesSubterranea = [' - ',
+    'Colocacion de precinto', 'Reajuste de fijacion', 'Colocacion de etiqueta', 'Otro'
+  ];
+  List<String> get _opcionesMateriales {
+    if (_tipoInstalacion == 'Subterranea') return _opcionesMaterialesSubterranea;
+    return _opcionesMaterialesAerea;
+  }
+
   final List<String> _opcionesPosteInter = ['Sí', 'No'];
   final List<String> _opcionesIdentificacionManual = ['Sí', 'No'];
   final List<String> _opcionesMantenimientoPreventivo = ['Sí', 'No'];
-  final List<String> _opcionesAccionPosteInter = [
+  final List<String> _opcionesAccionPosteInterAerea = [
     ' - ',
     'Se agenda pintado bajo norma',
     'Se ejecuta pintado bajo norma',
@@ -512,6 +453,20 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
     'Se ejecuta correccion de poste corroido',
     'No procede'
   ];
+  final List<String> _opcionesAccionPosteInterSubterranea = [
+    ' - a',
+    'Se agenda reemplazo de tapa',
+    'Se agenda reparacion de paredes',
+    'Se agenda mantenimiento de tuberia obstruida',
+    'Se ejecuta reemplazo de tapa',
+    'Se ejecuta reparacion de paredes',
+    'Se ejecuta mantenimiento de tuberia obstruida',
+    'Otro'
+  ];
+  List<String> get _opcionesAccionPosteInter {
+    if (_tipoInstalacion == 'Subterranea') return _opcionesAccionPosteInterSubterranea;
+    return _opcionesAccionPosteInterAerea;
+  }
   final List<String> _opcionesPosteInspeccionado = ['Sí', 'No'];
   final List<String> _opcionesObsDiseno = ['Sí', 'No'];
   final List<String> _opcionesTendidoActual = ['Bajo norma', 'Fuera de norma'];
@@ -544,16 +499,16 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
   };
 
   // Etiquetas condicionales
-  String get labelTramo => _tipoCable == '4 Hilos' ? 'FDT padre' : 'Identificación de tramo';
-  String get labelSoporteRetencion => _tipoCable == '4 Hilos' ? 'Soporte de Fibra Plana' : 'Soporte de Retención';
-  String get labelSoporteSuspension => _tipoCable == '4 Hilos' ? 'Nomenclatura del NAP' : 'Soporte de Suspensión';
+  String get labelTramo => _tipoCable == '4 Hilos' ? 'FDT padre' : 'Identificación de tramo'; //
+  String get labelSoporteRetencion => _tipoCable == '4 Hilos' ? 'Soporte de Fibra Plana' : 'Cantidad de Soporte de Retencion (S.R.)';
+  String get labelSoporteSuspension => _tipoCable == '4 Hilos' ? 'Nomenclatura del NAP' : 'Cantidad de Soporte de Suspension (S.S.)';
   List<String> get opcionesTipoElemento {
     if (_tipoCable == '4 Hilos') return ['NAP', '-'];
     if (_tipoCable == 'Cable de distribución') return ['FDT', '-'];
     if (_tipoCable == 'Cable alimentador') return ['CL', '-'];
     return ['CL', 'FDT'];
   }
-  bool get bloquearNomenclaturaNAP => _tipoCable == '4 Hilos' && _tipoElemento == '-';
+  bool get bloquearNomenclaturaNAP => _tipoCable == '4 Hilos' && _tipoElemento == 'NAP';
 
   int get totalPostesInspeccionados {
     if (_tabla.isEmpty) return 0;
@@ -597,6 +552,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
         _feederController.clear();
         _bufferController.clear();
         _tipoCable = 'Cable alimentador';
+        _tipoInstalacion = 'Aerea';
         _hilos = _opcionesHilos[_tipoCable]![0];
         _fdtPadreController.clear();
         _observacionesDiseno = 'Sí';
@@ -625,12 +581,15 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
         _zonasPodaFinController.clear();
         _observacionesController.clear();
         _trabajosPendientesController.clear();
+        _descripcionAccionPosteInterController.clear();
+        _descripcionMaterialesUtilizadosController.clear();
         _tabla.clear();
         _contador = 1;
         _bloquearCabecera = false;
         _editNro = null;
         _yk01Controller.clear();
         _descripcionEvidenciaController.clear();
+        _sfpController.clear();
         _fotosEvidencia.clear();
         _evidenciaFotografica.clear();
         _fotoSeleccionada = null;
@@ -703,12 +662,14 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
     'feeder': _feederController.text,
     'buffer': _bufferController.text,
     'tipoCable': _tipoCable,
+    'tipoInstalacion': _tipoInstalacion,
     'hilos': _hilos,
     'fdtPadre': _fdtPadreController.text,
     'yk01': _yk01Controller.text,
     'nomenclaturaElemento': _nomenclaturaElementoController.text,
     'observacionesDiseno': _observacionesDiseno,
     'posteInter': _posteInter,
+    'sfp': _sfpController.text,
     'identificacionManual': _posteInter == 'Sí' ? _identificacionManual : ' - ',
     'mantenimientoPreventivo': _posteInter == 'Sí' && _identificacionManual == 'Sí' ? _mantenimientoPreventivo : ' - ',
     'accionPosteInter': _posteInter == 'Sí' && _identificacionManual == 'Sí' && _mantenimientoPreventivo == 'Sí' ? _accionPosteInter : ' - ',
@@ -717,13 +678,12 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
         : ' - ',
     'posteInspeccionado': _posteInspeccionado,
     'materialesUtilizados': _materialesUtilizados,
-    'soporteRetencion': _soporteRetencionController.text,
+    'soporteRetencion': _tipoInstalacion == 'Subterranea' ? ' - ' : _soporteRetencionController.text,
     'soporteSuspension': _tipoCable == '4 Hilos' && _tipoElemento == '-' ? ' - ' : _soporteSuspensionController.text,
     'morseteriaIdentificada': _morseteriaIdentificada,
     'tipoElemento': _tipoElemento,
     'modeloElementoFijado': _modeloElementoFijado,
-    'elementoFijacion': _elementoFijacion,
-    'cantidadElemento': _cantidadElementoController.text,
+    'elementoFijacion': _elementoFijacion == 'otro' ? _cantidadElementoController.text : _elementoFijacion,
     'geolocalizacionElemento': _geolocalizacionElementoController.text,
     'tarjetaIdentificacion': _tarjetaIdentificacion,
     'tendidoActual': _tendidoActual,
@@ -735,6 +695,8 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
     'zonasPodaFin': _zonasPodaFinController.text,
     'observaciones': _observacionesController.text,
     'trabajosPendientes': _trabajosPendientesController.text,
+    'descripcionAccionPosteInter': _descripcionAccionPosteInterController.text,
+    'descripcionMaterialesUtilizados': _descripcionMaterialesUtilizadosController.text,
 
     'medicionesPuertos1550': _tipoCable == '4 Hilos' ? _medicionesPuertos1550.map((c) => c.text).toList() : null,
     'medicionesPuertos1490': _tipoCable == '4 Hilos' ? _medicionesPuertos1490.map((c) => c.text).toList() : null,
@@ -749,6 +711,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
         _feederController.text = fila['feeder'] ?? '';
         _bufferController.text = fila['buffer'] ?? '';
         _tipoCable = fila['tipoCable'];
+        _tipoInstalacion = fila['tipoInstalacion'] ?? 'Aerea';
         _hilos = fila['hilos'];
         _fdtPadreController.text = fila['fdtPadre'] ?? '';
         _observacionesDiseno = fila['observacionesDiseno'] ?? 'Sí';
@@ -774,12 +737,15 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
         _reservasAccion = fila['reservasAccion'] ?? _opcionesReservasAccion[0];
         _requierePoda = fila['requierePoda'] ?? 'No';
         _zonasPodaInicioController.text = fila['zonasPodaInicio'];
+        _sfpController.text = fila['sfp'] ?? '';
         _zonasPodaFinController.text = fila['zonasPodaFin'];
         _observacionesController.text = fila['observaciones'];
         _trabajosPendientesController.text = fila['trabajosPendientes'];
+        _descripcionAccionPosteInterController.text = fila['descripcionAccionPosteInter'] ?? '';
+        _descripcionMaterialesUtilizadosController.text = fila['descripcionMaterialesUtilizados'] ?? '';
         _yk01Controller.text = fila['yk01'] ?? '';
   _nomenclaturaElementoController.text = fila['nomenclaturaElemento'] ?? '';
-  _correctoEtiquetado = fila['correctoEtiquetado'] ?? 'Si';
+  _correctoEtiquetado = fila['correctoEtiquetado'] ?? 'Si'; //
         if (_tipoCable == '4 Hilos') {
           final l1550 = List<String>.from(fila['medicionesPuertos1550'] ?? []);
           final l1490 = List<String>.from(fila['medicionesPuertos1490'] ?? []);
@@ -827,6 +793,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
       'feeder': _feederController.text,
       'buffer': _bufferController.text,
       'tipoCable': _tipoCable,
+      'tipoInstalacion': _tipoInstalacion,
       'hilos': _hilos,
       'fdtPadre': _fdtPadreController.text,
       'tabla': List.from(_tabla),
@@ -1017,19 +984,20 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                     decoration: const pw.BoxDecoration(color: PdfColors.grey300),
                     children: [
                       pw.Text('Nro', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
-                      pw.Text('Cantidad YK01', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
-                      pw.Text('Obs. Diseño', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
+                      pw.Text('Tipo de instalacion', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
+                      pw.Text('Observaciones en Diseño', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
                       pw.Text('Propiedad de Inter', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
-                      pw.Text('Acción Poste Inter', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
-                      pw.Text('Fecha Tentativa', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
-                      pw.Text('Poste inspeccionado', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
-                      pw.Text('Soporte de Retención', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
-                      pw.Text('Soporte de Suspensión', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
+                      pw.Text('Accion en Punto Inter', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
+                      pw.Text('Fecha Tentativa', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)), //
+                      pw.Text('Punto inspeccionado', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
+                      pw.Text('YK01', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
+                      pw.Text('S.R.', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
+                      pw.Text('S.S.', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
                       pw.Text('Morsetería', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
                       pw.Text('Tipo de Elemento', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
-                      pw.Text('Modelo', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
-                      pw.Text('Elemento de fijación', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
-                      pw.Text('Descripción de fijación', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
+                      pw.Text('Modelo del Elemento', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
+                      pw.Text('Elemento de fijación', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)), //
+                      pw.Text('SFP', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
                       pw.Text('Geolocalización', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
                       pw.Text('Tarjeta Identificación', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
                       pw.Text('Tendido Actual', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 3)),
@@ -1048,19 +1016,20 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                   ..._tabla.map((fila) => pw.TableRow(
                     children: [
                       pw.Text('${fila['contador']}', style: const pw.TextStyle(fontSize: 3)),
-                      pw.Text(fila['yk01'] ?? '', style: const pw.TextStyle(fontSize: 3)),
+                      pw.Text('', style: const pw.TextStyle(fontSize: 3)), // Columna vacía para Tipo de instalacion
                       pw.Text(fila['observacionesDiseno'] ?? '', style: const pw.TextStyle(fontSize: 3)),
                       pw.Text(fila['posteInter'] ?? '', style: const pw.TextStyle(fontSize: 3)),
                       pw.Text(fila['accionPosteInter'] ?? '', style: const pw.TextStyle(fontSize: 3)),
                       pw.Text(fila['fechaCorreccion'] ?? ' - ', style: const pw.TextStyle(fontSize: 3)),
                       pw.Text(fila['posteInspeccionado'] ?? '', style: const pw.TextStyle(fontSize: 3)),
+                      pw.Text(fila['yk01'] ?? '', style: const pw.TextStyle(fontSize: 3)),
                       pw.Text(fila['soporteRetencion'] ?? '', style: const pw.TextStyle(fontSize: 3)),
                       pw.Text(fila['soporteSuspension'] ?? '', style: const pw.TextStyle(fontSize: 3)),
                       pw.Text(fila['morseteriaIdentificada'] ?? '', style: const pw.TextStyle(fontSize: 3)),
                       pw.Text(fila['tipoElemento'] ?? '', style: const pw.TextStyle(fontSize: 3)),
                       pw.Text(fila['modeloElementoFijado'] ?? '', style: const pw.TextStyle(fontSize: 3)),
-                      pw.Text(fila['elementoFijacion'] ?? '', style: const pw.TextStyle(fontSize: 3)),
-                      pw.Text(fila['cantidadElemento'] ?? '', style: const pw.TextStyle(fontSize: 3)),
+                      pw.Text(fila['elementoFijacion'] ?? '', style: const pw.TextStyle(fontSize: 3)), //
+                      pw.Text(fila['sfp'] ?? '', style: const pw.TextStyle(fontSize: 3)),
                       pw.Text(fila['geolocalizacionElemento'] ?? '', style: const pw.TextStyle(fontSize: 3)),
                       pw.Text(fila['tarjetaIdentificacion'] ?? '', style: const pw.TextStyle(fontSize: 3)),
                       pw.Text(fila['tendidoActual'] ?? '', style: const pw.TextStyle(fontSize: 3)),
@@ -1274,7 +1243,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                     pw.Text('Distancia total recorrida: $distanciaStr', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: PdfColors.blue)),
                     pw.SizedBox(height: 12),
                     pw.Text('Postes inspeccionados:', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
-                    pw.SizedBox(height: 8),
+                    pw.SizedBox(height: 4),
                     pw.Table(
                       border: pw.TableBorder.all(),
                       children: [
@@ -1330,7 +1299,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('Auditoria Mantenimiento'),
-              Text('Inspeccion por posteadura',style: TextStyle(fontSize: 12),
+              Text('Inspeccion punto a punto',style: TextStyle(fontSize: 12),
                 ),
               ],
             ),
@@ -1369,22 +1338,44 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                     _buildDropdownField('Hilos', _hilos, hilosOptions, (val) {
                       setState(() { _hilos = val!; });
                     }, enabled: !_bloquearCabecera),
-                    _buildTextField('Cantidad YK01', _yk01Controller, inputType: TextInputType.number),
+                    _buildDropdownField('Tipo de Instalacion', _tipoInstalacion, _opcionesTipoInstalacion, (val) {
+                      setState(() { _tipoInstalacion = val!; });
+                    }, onChangedExtra: (val) {
+                      setState(() {
+                        _tipoInstalacion = val ?? 'Aerea';
+                        // Resetear campos dependientes
+                        _accionPosteInter = _opcionesAccionPosteInter[0];
+                        _elementoFijacion = _opcionesElementoFijacion[0];
+                        _materialesUtilizados = _opcionesMateriales[0];
+                        if (_tipoInstalacion == 'Subterranea') {
+                          _yk01Controller.text = ' - ';
+                          _soporteRetencionController.text = ' - ';
+                          _soporteSuspensionController.text = ' - ';
+                          _tendidoActual = ' - ';
+                          _tendidoAccion = ' - ';
+                        } else {
+                          _yk01Controller.clear();
+                          _soporteRetencionController.clear();
+                          _tendidoActual = 'Bajo norma';
+                        }
+                        _morseteriaIdentificada = _tipoInstalacion == 'Subterranea' ? ' - ' : 'Bajo Norma';
+                      });
+                    }),
                     GeoField(
                       controller: _geolocalizacionElementoController,
-                      label: 'Geolocalización del elemento fijado',
+                      label: 'Geolocalización del Punto',
                     ),
-                    _buildDropdownField('Observaciones en diseño', _observacionesDiseno, _opcionesObsDiseno, (val) {
+                    _buildDropdownField('Observaciones en diseño', _observacionesDiseno, _opcionesObsDiseno, (val) { //
                       setState(() { _observacionesDiseno = val!; });
                     }),
-                    _buildDropdownField('Poste ya inspeccionado?', _posteInspeccionado, _opcionesPosteInspeccionado, (val) {
+                    _buildDropdownField('Punto ya inspeccionado?', _posteInspeccionado, _opcionesPosteInspeccionado, (val) {
                       setState(() { _posteInspeccionado = val!; });
                     }),
-                    _buildDropdownField('Poste propiedad de Inter', _posteInter, _opcionesPosteInter, (val) {
+                    _buildDropdownField('Punto propiedad de Inter', _posteInter, _opcionesPosteInter, (val) {
                       setState(() { 
                         _posteInter = val!; 
                         if (_posteInter == 'No') {
-                          _identificacionManual = 'Sí';
+                          _identificacionManual = 'Sí'; //
                           _mantenimientoPreventivo = 'Sí';
                           _accionPosteInter = ' - ';
                         }
@@ -1410,7 +1401,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                         });
                       }),
                     if (_posteInter == 'Sí' && _identificacionManual == 'Sí' && _mantenimientoPreventivo == 'Sí')
-                      _buildDropdownField('Acción Poste Propiedad de Inter', _accionPosteInter, _opcionesAccionPosteInter, (val) {
+                      _buildDropdownField('Accion en punto propiedad de inter', _accionPosteInter, _opcionesAccionPosteInter, (val) {
                         setState(() { 
                           _accionPosteInter = val!;
                           if (!val.contains('Se agenda')) {
@@ -1420,12 +1411,20 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                       }),
                     if (_posteInter == 'Sí' && _identificacionManual == 'Sí' && _mantenimientoPreventivo == 'Sí' && _accionPosteInter.contains('Se agenda'))
                       _buildDateField('Fecha de corrección', _fechaCorreccionController),
+                    if (_accionPosteInter == 'Otro' && _tipoInstalacion == 'Subterranea')
+                      _buildTextField('Descripcion de Accion en punto propiedad de inter', _descripcionAccionPosteInterController),
                     _buildDropdownField('Materiales utilizados', _materialesUtilizados, _opcionesMateriales, (val) {
                       setState(() { _materialesUtilizados = val!; });
                     }),
+                    if (_materialesUtilizados == 'Otro' && _tipoInstalacion == 'Subterranea')
+                      _buildTextField('Descripcion de Materiale Utilizados', _descripcionMaterialesUtilizadosController),
+                    _buildTextField('Cantidad YK01', _yk01Controller, 
+                      inputType: TextInputType.number,
+                      enabled: _tipoInstalacion != 'Subterranea'
+                    ),
                     _buildTextField(labelSoporteRetencion, _soporteRetencionController, 
                       inputType: TextInputType.number,
-                      enabled: _soporteSuspensionController.text.isEmpty,
+                      enabled: _soporteSuspensionController.text.isEmpty && _tipoInstalacion != 'Subterranea',
                       onChanged: (value) {
                         if (value.isNotEmpty) {
                           _soporteSuspensionController.clear();
@@ -1434,27 +1433,29 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                     ),
                     _buildTextField(labelSoporteSuspension, _soporteSuspensionController, 
                       inputType: TextInputType.number,
-                      enabled: !bloquearNomenclaturaNAP && _soporteRetencionController.text.isEmpty,
+                      enabled: !bloquearNomenclaturaNAP && _soporteRetencionController.text.isEmpty && _tipoInstalacion != 'Subterranea',
                       onChanged: (value) {
                         if (value.isNotEmpty) {
                           _soporteRetencionController.clear();
                         }
                       }
                     ),
-                    _buildDropdownField('Identificación de la morsetería', _morseteriaIdentificada, _opcionesMorseteria, (val) {
+                    _buildDropdownField('Identificación de la morsetería', _morseteriaIdentificada, _opcionesMorseteriaAerea, enabled: _tipoInstalacion != 'Subterranea', (val) {
                       setState(() { _morseteriaIdentificada = val!; });
                     }),
+                    if (_tipoCable == '4 Hilos')
+                      _buildTextField('Soporte de Fibra Plana', _sfpController),
                     _buildDropdownField('Tipo de Elemento', _tipoElemento, tipoElementoOptions, (val) {
                       setState(() { _tipoElemento = val!; _modeloElementoFijado = _opcionesModeloElemento[val]![0]; });
                     }),
-                    _buildDropdownField('Modelo de elemento fijado', _modeloElementoFijado, modeloOptions, (val) {
+                    _buildDropdownField('Modelo del Elemento', _modeloElementoFijado, modeloOptions, (val) {
                       setState(() { _modeloElementoFijado = val!; });
                     }),
                     if (_tipoElemento == 'CL')
                       _buildTextField('Nomenclatura CL', _nomenclaturaElementoController),
                     if (_tipoElemento == 'FDT')
                       _buildTextField('Nomenclatura FDT', _nomenclaturaElementoController),
-                    _buildDropdownField('Correcto etiquetado', _correctoEtiquetado, ['Si', 'No'], (val) {
+                    _buildDropdownField('Correcto Etiquetado', _correctoEtiquetado, ['Si', 'No'], (val) {
                       setState(() {
                         _correctoEtiquetado = val ?? 'Si';
                       });
@@ -1462,12 +1463,12 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                     _buildDropdownField('Elemento de fijación', _elementoFijacion, _opcionesElementoFijacion, (val) {
                       setState(() { _elementoFijacion = val!; });
                     }),
-                    _buildTextField('Descripción de fijación', _cantidadElementoController, enabled: _elementoFijacion == 'otro'),
-                    _buildDropdownField('Contiene tarjeta de identificación de FO', _tarjetaIdentificacion, _opcionesTarjetaIdentificacion, (val) {
+                    if (_elementoFijacion == 'otro') _buildTextField('Descripción de fijación', _cantidadElementoController),
+                    _buildDropdownField('Tarjeta de Identificación', _tarjetaIdentificacion, _opcionesTarjetaIdentificacion, (val) {
                       setState(() { _tarjetaIdentificacion = val!; });
                     }),
                     // Tendido con perdida de tensión actual/acción
-                    _buildDropdownField('Tendido con perdida de tensión actual', _tendidoActual, _opcionesTendidoActual, (val) { 
+                    _buildDropdownField('Tendido Actual', _tendidoActual, _opcionesTendidoActual, enabled: _tipoInstalacion != 'Subterranea', (val) { 
                       setState(() { 
                         _tendidoActual = val!; 
                         if (val == 'Bajo norma') {
@@ -1477,7 +1478,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                         }
                       }); 
                     }),
-                    _buildDropdownField('Tendido con perdida de tensión acción', _tendidoAccion, _opcionesTendidoAccionDinamicas, (val) { setState(() { _tendidoAccion = val!; }); }),
+                    _buildDropdownField('Tendido Acción', _tendidoAccion, _opcionesTendidoAccionDinamicas, enabled: _tipoInstalacion != 'Subterranea', (val) { setState(() { _tendidoAccion = val!; }); }),
                     _buildDropdownField('Reservas Actual', _opcionesReservasActual.contains(_reservasActual) ? _reservasActual : _opcionesReservasActual[0], _opcionesReservasActual, (val) {
                       setState(() { 
                         _reservasActual = val!; 
@@ -1683,28 +1684,32 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                       child: SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         child: DataTable(
+                          columnSpacing: 12,
+                          headingRowHeight: 40,
                           columns: [
-                            const DataColumn(label: Text('Nro')),
-                            const DataColumn(label: Text('Obs. Diseño')),
-                            const DataColumn(label: Text('Poste Inter')),
-                            const DataColumn(label: Text('Identificación Manual')),
-                            const DataColumn(label: Text('Mantenimiento Preventivo')),
-                            const DataColumn(label: Text('Acción Poste Inter')),
-                            const DataColumn(label: Text('Poste inspeccionado')),
-                            DataColumn(label: Text(labelSoporteRetencion)),
-                            DataColumn(label: Text(labelSoporteSuspension)),
-                            const DataColumn(label: Text('Morsetería')),
-                            const DataColumn(label: Text('Tipo de Elemento')),
-                            const DataColumn(label: Text('Modelo')),
-                            const DataColumn(label: Text('Elemento de fijación')),
-                            const DataColumn(label: Text('Descripción de fijación')),
-                            const DataColumn(label: Text('Geolocalización')),
-                            const DataColumn(label: Text('Tarjeta Identificación')),
+                            const DataColumn(label: Text('Nro', style: TextStyle(fontWeight: FontWeight.bold))),
+                            const DataColumn(label: Text('Tipo de instalacion', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10))),
+                            const DataColumn(label: Text('Observaciones en Diseño', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10))),
+                            const DataColumn(label: Text('Propiedad de Inter', style: TextStyle(fontWeight: FontWeight.bold))),
+                            const DataColumn(label: Text('Accion en Punto Inter', style: TextStyle(fontWeight: FontWeight.bold))),
+                            const DataColumn(label: Text('Fecha Tentativa', style: TextStyle(fontWeight: FontWeight.bold))),
+                            const DataColumn(label: Text('Punto inspeccionado', style: TextStyle(fontWeight: FontWeight.bold))),
+                            const DataColumn(label: Text('YK01', style: TextStyle(fontWeight: FontWeight.bold))),
+                            const DataColumn(label: Text('S.R.', style: TextStyle(fontWeight: FontWeight.bold))),
+                            const DataColumn(label: Text('S.S.', style: TextStyle(fontWeight: FontWeight.bold))),
+                            const DataColumn(label: Text('Morsetería', style: TextStyle(fontWeight: FontWeight.bold))),
+                            const DataColumn(label: Text('Tipo de Elemento', style: TextStyle(fontWeight: FontWeight.bold))),
+                            const DataColumn(label: Text('Modelo del Elemento', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10))),
+                            const DataColumn(label: Text('Elemento de fijación', style: TextStyle(fontWeight: FontWeight.bold))), //
+                            const DataColumn(label: Text('SFP', style: TextStyle(fontWeight: FontWeight.bold))),
+                            const DataColumn(label: Text('Geolocalización', style: TextStyle(fontWeight: FontWeight.bold))),
+                            const DataColumn(label: Text('Tarjeta Identificación', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10))),
                             const DataColumn(label: Text('Tendido Actual')),
                             const DataColumn(label: Text('Tendido Acción')),
                             const DataColumn(label: Text('Reservas Actual')),
                             const DataColumn(label: Text('Reservas Acción')),
-                            const DataColumn(label: Text('Requiere poda')),
+                            const DataColumn(label: Text('Requiere Poda')),
+                            const DataColumn(label: Text('Correcto Etiquetado')),
 
                             if (_tipoCable == '4 Hilos') const DataColumn(label: Text('Mediciones 1550nm')),
                             if (_tipoCable == '4 Hilos') const DataColumn(label: Text('Mediciones 1490nm')),
@@ -1715,27 +1720,28 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                             return DataRow(
                               cells: [
                                 DataCell(Text('${fila['contador']}', style: const TextStyle(fontSize: 10))),
+                                DataCell(Text(fila['tipoInstalacion'] ?? '', style: const TextStyle(fontSize: 10))),
                                 DataCell(Text(fila['observacionesDiseno'] ?? '', style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis, maxLines: 3)),
                                 DataCell(Text(fila['posteInter'] ?? '', style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis, maxLines: 3)),
-                                DataCell(Text(fila['identificacionManual'] ?? '', style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis, maxLines: 3)),
-                                DataCell(Text(fila['mantenimientoPreventivo'] ?? '', style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis, maxLines: 3)),
                                 DataCell(
                                   SizedBox(
                                     width: 144,
                                     child: SingleChildScrollView(
                                       scrollDirection: Axis.horizontal,
-                                      child: Text(fila['accionPosteInter'] ?? '', style: const TextStyle(fontSize: 8)),
+                                      child: Text(fila['accionPosteInter'] ?? '', style: const TextStyle(fontSize: 10)),
                                     ),
                                   ),
                                 ),
+                                DataCell(Text(fila['fechaCorreccion'] ?? ' - ', style: const TextStyle(fontSize: 10))),
                                 DataCell(Text(fila['posteInspeccionado'] ?? '', style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis, maxLines: 3)),
+                                DataCell(Text(fila['yk01'] ?? '', style: const TextStyle(fontSize: 10))),
                                 DataCell(Text(fila['soporteRetencion'] ?? '', style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis, maxLines: 3)),
                                 DataCell(Text(fila['soporteSuspension'] ?? '', style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis, maxLines: 3)),
                                 DataCell(Text(fila['morseteriaIdentificada'] ?? '', style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis, maxLines: 3)),
                                 DataCell(Text(fila['tipoElemento'] ?? '', style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis, maxLines: 3)),
                                 DataCell(Text(fila['modeloElementoFijado'] ?? '', style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis, maxLines: 3)),
-                                DataCell(Text(fila['elementoFijacion'] ?? '', style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis, maxLines: 3)),
-                                DataCell(Text(fila['cantidadElemento'] ?? '', style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis, maxLines: 3)),
+                                DataCell(Text(fila['elementoFijacion'] ?? '', style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis, maxLines: 3)), //
+                                DataCell(Text(fila['sfp'] ?? '', style: const TextStyle(fontSize: 10))),
                                 DataCell(Text(fila['geolocalizacionElemento'] ?? '', style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis, maxLines: 3)),
                                 DataCell(Text(fila['tarjetaIdentificacion'] ?? '', style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis, maxLines: 3)),
                                 DataCell(Text(fila['tendidoActual'] ?? '', style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis, maxLines: 3)),
@@ -1743,6 +1749,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                                 DataCell(Text(fila['reservasActual'] ?? '', style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis, maxLines: 3)),
                                 DataCell(Text(fila['reservasAccion'] ?? '', style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis, maxLines: 3)),
                                 DataCell(Text(fila['requierePoda'] ?? '', style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis, maxLines: 3)),
+                                DataCell(Text(fila['correctoEtiquetado'] ?? '', style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis, maxLines: 3)),
 
                                 if (_tipoCable == '4 Hilos')
                                   DataCell(
@@ -1824,11 +1831,11 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
     );
   }
 
-  Widget _buildDropdownField(String label, String value, List<String> items, ValueChanged<String?> onChanged, {bool enabled = true}) {
+  Widget _buildDropdownField(String label, String value, List<String> items, ValueChanged<String?> onChanged, {bool enabled = true, ValueChanged<String?>? onChangedExtra}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: DropdownButtonFormField<String>(
-        initialValue: value,
+        value: items.contains(value) ? value : null,
         decoration: InputDecoration(
           labelText: label,
           border: const OutlineInputBorder(),
@@ -1839,7 +1846,12 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
           value: item, 
           child: Text(item, overflow: TextOverflow.ellipsis, maxLines: 2)
         )).toList(),
-        onChanged: enabled ? onChanged : null,
+        onChanged: enabled ? (val) {
+          onChanged(val);
+          if (onChangedExtra != null) {
+            onChangedExtra(val);
+          }
+        } : null,
       ),
     );
   }

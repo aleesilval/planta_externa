@@ -1,9 +1,9 @@
-// ignore_for_file: use_build_context_synchronously
+// ignore_for_file: use_build_context_synchronously, deprecated_member_use
 
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:planta_externa/screens/map_widget.dart';
 
 class GeoField extends StatefulWidget {
   final TextEditingController controller;
@@ -104,32 +104,13 @@ class _GeoFieldState extends State<GeoField> {
               content: SizedBox(
                 width: 320,
                 height: 380,
-                child: FlutterMap(
-                  options: MapOptions(
-                    initialCenter: initial,
-                    initialZoom: 16,
-                    onTap: (tapPosition, point) {
-                      setStateDialog(() {
-                        selected = point;
-                      });
-                    },
-                  ),
-                  children: [
-                    TileLayer(
-                      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                      userAgentPackageName: 'com.example.planta_externa',
-                    ),
-                    MarkerLayer(
-                      markers: [
-                        Marker(
-                          point: selected,
-                          width: 40,
-                          height: 40,
-                          child: const Icon(Icons.location_on, color: Colors.red, size: 40),
-                        ),
-                      ],
-                    ),
-                  ],
+                child: MapaConFondo(
+                  singleMarker: selected,
+                  onTap: (tapPosition, point) {
+                    setStateDialog(() {
+                      selected = point;
+                    });
+                  },
                 ),
               ),
               actions: [
@@ -181,9 +162,7 @@ class _GeoFieldState extends State<GeoField> {
           ),
         ),
         readOnly: true,
-        onTap: widget.enabled ? _getCurrentLocation : null,
       ),
     );
   }
 }
-

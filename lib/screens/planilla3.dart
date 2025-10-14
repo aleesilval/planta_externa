@@ -631,8 +631,7 @@ class _Planilla3PageState extends State<Planilla3Page> {
       if (mounted) {
         if (success) {
           final safeNomenclatura = _nomenclaturaController.text.isNotEmpty ? _nomenclaturaController.text.replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1F\s]'), '_') : 'reporte';
-          // El nombre se construye en report_logic.dart como 'feeder-buffer-nomenclatura'.
-          final zipName = '---$safeNomenclatura.zip';
+          final zipName = '--$safeNomenclatura.zip';
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Archivo $zipName generado exitosamente en:\n$selectedDirectory'),
