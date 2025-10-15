@@ -40,24 +40,6 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
   // Campo para correcto etiquetado
   String _correctoEtiquetado = 'Si';
   /// Calcula la distancia entre dos puntos (Haversine, en metros)
-  double _haversine(double lat1, double lon1, double lat2, double lon2) {
-    const R = 6371000.0; // Radio de la Tierra en metros
-    final dLat = _deg2rad(lat2 - lat1);
-    final dLon = _deg2rad(lon2 - lon1);
-    final a =
-        math.sin(dLat / 2) * math.sin(dLat / 2) +
-        math.cos(_deg2rad(lat1)) * math.cos(_deg2rad(lat2)) *
-        math.sin(dLon / 2) * math.sin(dLon / 2);
-    final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
-    return R * c;
-  }
-
-
-
-
-
-
-  double _deg2rad(double deg) => deg * math.pi / 180.0;
 
   // === VARIABLES DE CONTROL ===
   final _formKey = GlobalKey<FormState>(); // Clave para validación del formulario
@@ -266,16 +248,20 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
       }
 
       // Construir path (traza) y marcadores con etiquetas
-      final pathPoints = sampledCoords.map((c) {
-        return '${c['lat']},${c['lng']},red-circle-stroked,${c['poste']}';
-      }).join('|');
-      final pathParam = 'color:0xff0000|weight:3|' + sampledCoords.map((c) => '${c['lat']},${c['lng']}').join('|');
+      final pathPoints = sampledCoords.map((c) => '${c['lat']},${c['lng']},red-circle-stroked,${c['poste']}').join('|');
+      final pathParam = 'color:0xff0000|weight:3|' + sampledCoords.map((c) => '${c['lat']},${c['lng']}').join('|'); // La línea de la ruta
 
       final int width = 1000;
       final int height = 500;
 
-      final url = 'https://staticmap.openstreetmap.de/staticmap.php?center=$centerLat,$centerLng&zoom=$zoom&size=${width}x$height&maptype=mapnik&path=${Uri.encodeComponent(pathParam)}&path=${Uri.encodeComponent(pathPoints)}';
-
+      final url = Uri.https('staticmap.openstreetmap.de', '/staticmap.php', {
+        'center': '$centerLat,$centerLng',
+        'zoom': '$zoom',
+        'size': '${width}x$height',
+        'maptype': 'mapnik',
+        'path': pathParam,
+        'markers': pathPoints, // Usar 'markers' para los puntos con etiquetas
+      }).toString();
       final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 12));
       if (response.statusCode == 200) {
         return response.bodyBytes;
@@ -1022,6 +1008,21 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
     );
   }
 
+  /// Calcula la distancia total de la ruta usando la fórmula de Haversine.
+  double _calcularDistanciaTotal(List<Map<String, double>> coordenadas) {
+    double totalDistancia = 0.0;
+    for (int i = 0; i < coordenadas.length - 1; i++) {
+      final p1 = coordenadas[i];
+      final p2 = coordenadas[i + 1];
+      totalDistancia += _haversine(p1['lat']!, p1['lng']!, p2['lat']!, p2['lng']!);
+    }
+    return totalDistancia;
+  }
+
+  /// Convierte grados a radianes.
+  double _deg2rad(double deg) => deg * (math.pi / 180.0);
+
+  /// Calcula la distancia entre dos coordenadas en metros (fórmula de Haversine).
   Future<void> _exportarPDF() async {
     final pdf = pw.Document();
     int inspeccionados = _tabla.where((fila) => fila['posteInspeccionado'] == 'Sí').length;
@@ -1267,12 +1268,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
       }).where((c) => c != null).cast<Map<String, double>>().toList();
 
       // Calcular distancia total usando Haversine
-      double totalDistanciaMetros = 0.0;
-      for (int i = 1; i < coordenadasValidas.length; i++) {
-        final a = coordenadasValidas[i - 1];
-        final b = coordenadasValidas[i];
-        totalDistanciaMetros += _haversine(a['lat']!, a['lng']!, b['lat']!, b['lng']!);
-      }
+      double totalDistanciaMetros = _calcularDistanciaTotal(coordenadasValidas);
       String distanciaStr;
       if (totalDistanciaMetros >= 1000) {
         distanciaStr = (totalDistanciaMetros / 1000).toStringAsFixed(2) + ' km';
@@ -1364,6 +1360,19 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
     await Printing.layoutPdf(
       onLayout: (PdfPageFormat format) async => pdf.save(),
     );
+  }
+
+  /// Calcula la distancia entre dos puntos (Haversine, en metros)
+  double _haversine(double lat1, double lon1, double lat2, double lon2) {
+    const R = 6371000.0; // Radio de la Tierra en metros
+    final dLat = _deg2rad(lat2 - lat1);
+    final dLon = _deg2rad(lon2 - lon1);
+    final a =
+        math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(_deg2rad(lat1)) * math.cos(_deg2rad(lat2)) *
+        math.sin(dLon / 2) * math.sin(dLon / 2);
+    final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+    return R * c;
   }
 
   @override
