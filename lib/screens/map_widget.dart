@@ -1,6 +1,8 @@
 // ignore_for_file: prefer_const_constructors
 
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
+
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -16,6 +18,11 @@ class MapaConFondo extends StatelessWidget {
     this.singleMarker,
     this.onTap,
   });
+
+  // Recomendación: Mover la URL a una constante para facilitar su mantenimiento.
+  static const String _urlTemplate = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+  static const String _packageName = 'com.example.planta_externa';
+
 
   @override
   Widget build(BuildContext context) {
@@ -58,14 +65,24 @@ class MapaConFondo extends StatelessWidget {
       ),
       children: [
         TileLayer(
-          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          userAgentPackageName: 'com.example.planta_externa',
+          urlTemplate: _urlTemplate,
+          userAgentPackageName: _packageName,
         ),
         if (points.length > 1) PolylineLayer(polylines: [Polyline(points: points, color: Colors.red, strokeWidth: 3)]),
         MarkerLayer(markers: markers),
         RichAttributionWidget(
           attributions: [
             TextSourceAttribution('OpenStreetMap contributors'),
+            // Recomendación: Añadir un enlace para reportar errores en el mapa.
+            TextSourceAttribution(
+              'Report a map issue',
+              onTap: () async {
+                final Uri url = Uri.parse('https://www.openstreetmap.org/fixthemap');
+                if (!await launchUrl(url)) {
+                  // Podrías mostrar un snackbar o loggear el error si no se puede abrir la URL.
+                }
+              },
+            ),
           ],
         ),
       ],
