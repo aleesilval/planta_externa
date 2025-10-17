@@ -526,7 +526,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
     'CL': ['288H distribucion','144H distribucion','144H continuidad','288H continuidad','144H reparacion','288H reparacion', 'mini96H'],
     'FDT': ['CL288', 'IP67'],
     'FDT Secundario': ['CL288', 'IP67'],
-    '-': ['-'],
+    'Ninguno': ['-'],
   };
 
   // Etiquetas condicionales
@@ -534,10 +534,10 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
   String get labelSoporteRetencion => _tipoCable == '4 Hilos' ? 'Soporte de Fibra Plana' : 'Cantidad de Soporte de Retencion (S.R.)';
   String get labelSoporteSuspension => _tipoCable == '4 Hilos' ? 'Nomenclatura del NAP' : 'Cantidad de Soporte de Suspension (S.S.)';
   List<String> get opcionesTipoElemento {
-    if (_tipoCable == '4 Hilos') return ['NAP', '-'];
-    if (_tipoCable == 'Cable de distribución') return ['FDT', '-'];
-    if (_tipoCable == 'Cable alimentador') return ['CL', '-'];
-    return ['CL', 'FDT'];
+    if (_tipoCable == '4 Hilos') return ['NAP', 'Ninguno'];
+    if (_tipoCable == 'Cable de distribución') return ['FDT', 'Ninguno'];
+    if (_tipoCable == 'Cable alimentador') return ['CL', 'Ninguno'];
+    return ['CL', 'FDT', 'Ninguno'];
   }
   bool get bloquearNomenclaturaNAP => _tipoCable == '4 Hilos' && _tipoElemento == 'NAP';
 
@@ -1542,27 +1542,42 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                       setState(() { _morseteriaIdentificada = val!; });
                     }),
                     _buildDropdownField('Tipo de Elemento', _tipoElemento, tipoElementoOptions, (val) {
-                      setState(() { _tipoElemento = val!; _modeloElementoFijado = _opcionesModeloElemento[val]![0]; _nomenclaturaElementoController.clear(); });
+                      setState(() {
+                        _tipoElemento = val!;
+                        _modeloElementoFijado = _opcionesModeloElemento[val]![0];
+                        _nomenclaturaElementoController.clear();
+                        if (_tipoElemento == 'Ninguno') {
+                          _correctoEtiquetado = ' - ';
+                        } else {
+                          _correctoEtiquetado = 'Si';
+                        }
+                      });
                     }),
-                    _buildDropdownField('Modelo del Elemento', _modeloElementoFijado, modeloOptions, (val) {
+                    _buildDropdownField('Modelo del Elemento', _modeloElementoFijado, modeloOptions, enabled: _tipoElemento != 'Ninguno', (val) {
                       setState(() { _modeloElementoFijado = val!; });
                     }),
+                    _buildDropdownField('Correcto Etiquetado', _correctoEtiquetado, _tipoElemento != 'Ninguno' ? ['Si', 'No'] : [' - '], (val) {
+                        setState(() {
+                          _correctoEtiquetado = val ?? 'Si';
+                        });
+                      },
+                      enabled: _tipoElemento != 'Ninguno',
+                    ),
                     if (_tipoElemento == 'CL')
                       _buildTextField('Nomenclatura CL', _nomenclaturaElementoController),
                     if (_tipoElemento == 'FDT')
                       _buildTextField('Nomenclatura FDT', _nomenclaturaElementoController),
-                    _buildDropdownField('Correcto Etiquetado', _correctoEtiquetado, ['Si', 'No'], (val) {
-                      setState(() {
-                        _correctoEtiquetado = val ?? 'Si';
-                      });
-                    }),
                     _buildDropdownField('Elemento de fijación', _elementoFijacion, _opcionesElementoFijacion, (val) {
                       setState(() { _elementoFijacion = val!; });
                     }),
                     if (_elementoFijacion == 'otro') _buildTextField('Descripción de fijación', _cantidadElementoController),
                     _buildDropdownField('Tarjeta de Identificación', _tarjetaIdentificacion, _opcionesTarjetaIdentificacion, (val) {
-                      setState(() { _tarjetaIdentificacion = val!; });
-                    }),
+                      setState(() {
+                        _tarjetaIdentificacion = val!;
+                      });
+                    },
+                      enabled: _tipoElemento != '-',
+                    ),
                     _buildDropdownField('Tendido Actual', _tendidoActual, _opcionesTendidoActual, enabled: _tipoInstalacion != 'Subterranea', (val) { 
                       setState(() { 
                         _tendidoActual = val!; 
@@ -1573,7 +1588,9 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                         }
                       }); 
                     }),
-                    _buildDropdownField('Tendido Acción', _tendidoAccion, _opcionesTendidoAccionDinamicas, enabled: _tipoInstalacion != 'Subterranea', (val) { setState(() { _tendidoAccion = val!; }); }),
+                    _buildDropdownField(
+                      'Tendido Acción', _tendidoAccion, _opcionesTendidoAccionDinamicas, enabled: _tipoInstalacion != 'Subterranea' && _tendidoActual != 'Bajo norma', (val) { setState(() { _tendidoAccion = val!; }); },
+                    ),
                     _buildDropdownField('¿Posee reserva?', _poseeReserva, ['Sí', 'No'], (val) {
                       setState(() {
                         _poseeReserva = val!;
@@ -1586,7 +1603,8 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                           }
                         }
                       });
-                    }),
+                    },
+                    ),
                     _buildDropdownField('Reservas Actual', _opcionesReservasActual.contains(_reservasActual) ? _reservasActual : _opcionesReservasActual[0], _opcionesReservasActual, enabled: _poseeReserva == 'Sí', (val) {
                       setState(() { 
                         _reservasActual = val!; 
@@ -1597,9 +1615,13 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                         }
                       });
                     }),
-                    _buildDropdownField('Reservas Acción', _opcionesReservasAccionDinamicas.contains(_reservasAccion) ? _reservasAccion : _opcionesReservasAccionDinamicas[0], _opcionesReservasAccionDinamicas, enabled: _poseeReserva == 'Sí', (val) {
-                      setState(() { _reservasAccion = val!; });
-                    }),
+                    _buildDropdownField(
+                      'Reservas Acción',
+                      _opcionesReservasAccionDinamicas.contains(_reservasAccion) ? _reservasAccion : _opcionesReservasAccionDinamicas[0],
+                      _opcionesReservasAccionDinamicas,
+                      enabled: _poseeReserva == 'Sí',
+                      (val) { setState(() { _reservasAccion = val!; }); }
+                    ),
                     _buildDropdownField('Requiere poda', _requierePoda, _opcionesRequierePoda, (val) {
                       setState(() { _requierePoda = val!; });
                     }),
@@ -1683,7 +1705,7 @@ class _FormularioPlantaExternaState extends State<FormularioPlantaExterna> {
                             width: 140,
                             child: ElevatedButton.icon(
                               icon: const Icon(Icons.photo_library),
-                              label: const Text('Seleccionar'),
+                              label: const Text('Select'),
                               onPressed: _selectPhoto,
                             ),
                           ),
